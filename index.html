@@ -1,0 +1,2306 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MPS 2.0 — Sistema de Gestión de Impresión</title>
+    <!-- Tailwind CSS vía CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter para tipografía limpia y profesional -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Lucide Icons para iconografía -->
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+
+    <!-- ============================================================
+         CONFIGURACIÓN DE TAILWIND: Paleta de colores corporativa
+         ============================================================ -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        'inter': ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        // Azul profesional corporativo
+                        primary: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            200: '#bfdbfe',
+                            300: '#93c5fd',
+                            400: '#60a5fa',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            800: '#1e40af',
+                            900: '#1e3a5f',
+                        },
+                        // Verde esmeralda para estados positivos / costos
+                        success: {
+                            50: '#ecfdf5',
+                            100: '#d1fae5',
+                            200: '#a7f3d0',
+                            300: '#6ee7b7',
+                            400: '#34d399',
+                            500: '#10b981',
+                            600: '#059669',
+                            700: '#047857',
+                        },
+                        // Rojo para alertas / garantías vencidas
+                        danger: {
+                            50: '#fef2f2',
+                            100: '#fee2e2',
+                            200: '#fecaca',
+                            300: '#fca5a5',
+                            400: '#f87171',
+                            500: '#ef4444',
+                            600: '#dc2626',
+                            700: '#b91c1c',
+                        },
+                        // Amarillo para advertencias / suministros bajos
+                        warning: {
+                            50: '#fffbeb',
+                            100: '#fef3c7',
+                            200: '#fde68a',
+                            300: '#fcd34d',
+                            400: '#fbbf24',
+                            500: '#f59e0b',
+                            600: '#d97706',
+                        },
+                        // Grises limpios para fondos y texto
+                        slate: {
+                            50: '#f8fafc',
+                            100: '#f1f5f9',
+                            200: '#e2e8f0',
+                            300: '#cbd5e1',
+                            400: '#94a3b8',
+                            500: '#64748b',
+                            600: '#475569',
+                            700: '#334155',
+                            800: '#1e293b',
+                            900: '#0f172a',
+                        },
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- ============================================================
+         ESTILOS CSS ADICIONALES
+         ============================================================ -->
+    <style>
+        /* Fuente base global */
+        * { font-family: 'Inter', sans-serif; }
+
+        /* Transiciones suaves para navegación */
+        .page-section {
+            display: none;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        .page-section.active {
+            display: block;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Scrollbar personalizada */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+
+        /* Sidebar overlay para móvil */
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.5);
+            z-index: 40;
+            backdrop-filter: blur(2px);
+        }
+        .sidebar-overlay.show { display: block; }
+
+        /* Sidebar responsive */
+        @media (max-width: 1023px) {
+            .app-sidebar {
+                transform: translateX(-100%);
+                transition: transform 0.3s ease-in-out;
+            }
+            .app-sidebar.open {
+                transform: translateX(0);
+            }
+        }
+
+        /* Gráficos placeholder */
+        .chart-bar {
+            transition: height 0.5s ease-in-out;
+        }
+        .chart-line {
+            stroke-dasharray: 1000;
+            stroke-dashoffset: 1000;
+            animation: drawLine 1.5s ease forwards;
+        }
+        @keyframes drawLine {
+            to { stroke-dashoffset: 0; }
+        }
+
+        /* Badges de estado */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 10px;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            letter-spacing: 0.025em;
+        }
+        .badge-active   { background: #d1fae5; color: #065f46; }
+        .badge-repair   { background: #fef3c7; color: #92400e; }
+        .badge-down     { background: #fee2e2; color: #991b1b; }
+        .badge-warranty { background: #dbeafe; color: #1e40af; }
+        .badge-expired  { background: #fee2e2; color: #991b1b; }
+
+        /* Toggle switch personalizado */
+        .toggle-switch {
+            position: relative;
+            width: 44px;
+            height: 24px;
+        }
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            inset: 0;
+            background: #cbd5e1;
+            border-radius: 24px;
+            transition: 0.3s;
+        }
+        .toggle-slider:before {
+            content: '';
+            position: absolute;
+            width: 18px;
+            height: 18px;
+            left: 3px;
+            bottom: 3px;
+            background: white;
+            border-radius: 50%;
+            transition: 0.3s;
+        }
+        .toggle-switch input:checked + .toggle-slider {
+            background: #10b981;
+        }
+        .toggle-switch input:checked + .toggle-slider:before {
+            transform: translateX(20px);
+        }
+
+        /* Tabla responsiva */
+        .table-responsive {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+    </style>
+</head>
+
+<body class="bg-slate-50 text-slate-800 antialiased">
+
+    <!-- ============================================================
+         LAYOUT PRINCIPAL: Sidebar + Contenido
+         ============================================================ -->
+    <div class="flex min-h-screen">
+
+        <!-- ========================================
+             OVERLAY PARA SIDEBAR EN MÓVIL
+             ======================================== -->
+        <div id="sidebarOverlay" class="sidebar-overlay" onclick="toggleSidebar()"></div>
+
+        <!-- ========================================
+             BARRA LATERAL (SIDEBAR)
+             ======================================== -->
+        <aside id="appSidebar"
+               class="app-sidebar fixed lg:sticky top-0 left-0 z-50 h-screen w-72 bg-slate-900 text-white flex flex-col
+                      shadow-2xl lg:shadow-none overflow-y-auto">
+
+            <!-- Logo / Brand -->
+            <div class="flex items-center gap-3 px-6 py-6 border-b border-slate-700">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-primary-700
+                            flex items-center justify-center shadow-lg">
+                    <i data-lucide="printer" class="w-5 h-5 text-white"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold tracking-tight">MPS 2.0</h1>
+                    <p class="text-xs text-slate-400">Gestión de Impresión</p>
+                </div>
+            </div>
+
+            <!-- Selector de Rol -->
+            <div class="px-4 py-4 border-b border-slate-700">
+                <label class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 block">
+                    Rol Activo
+                </label>
+                <select id="roleSelector"
+                        class="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2.5
+                               text-sm text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500
+                               outline-none cursor-pointer"
+                        onchange="changeRole(this.value)">
+                    <option value="gerente">🏢 Gerente General</option>
+                    <option value="finanzas">💰 Finanzas</option>
+                    <option value="tecnico">🔧 Técnico</option>
+                    <option value="freelance">🚀 Freelance</option>
+                </select>
+            </div>
+
+            <!-- Navegación del Menú -->
+            <nav class="flex-1 px-3 py-4 space-y-1">
+                <!-- Dashboard -->
+                <a href="#" onclick="navigateTo('dashboard')"
+                   class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
+                          transition-all duration-200 hover:bg-slate-800 text-slate-300"
+                   data-section="dashboard">
+                    <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+                    <span>Dashboard</span>
+                </a>
+
+                <!-- Gestión Multicliente -->
+                <a href="#" onclick="navigateTo('clientes')"
+                   class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
+                          transition-all duration-200 hover:bg-slate-800 text-slate-300"
+                   data-section="clientes">
+                    <i data-lucide="building-2" class="w-5 h-5"></i>
+                    <span>Gestión Multicliente</span>
+                </a>
+
+                <!-- Parque de Impresoras -->
+                <a href="#" onclick="navigateTo('impresoras')"
+                   class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
+                          transition-all duration-200 hover:bg-slate-800 text-slate-300"
+                   data-section="impresoras">
+                    <i data-lucide="printer" class="w-5 h-5"></i>
+                    <span>Parque de Impresoras</span>
+                </a>
+
+                <!-- Registro Operativo -->
+                <a href="#" onclick="navigateTo('operativo')"
+                   class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
+                          transition-all duration-200 hover:bg-slate-800 text-slate-300"
+                   data-section="operativo">
+                    <i data-lucide="clipboard-list" class="w-5 h-5"></i>
+                    <span>Registro Operativo</span>
+                </a>
+
+                <!-- Usuarios -->
+                <a href="#" onclick="navigateTo('usuarios')"
+                   class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
+                          transition-all duration-200 hover:bg-slate-800 text-slate-300"
+                   data-section="usuarios">
+                    <i data-lucide="users" class="w-5 h-5"></i>
+                    <span>Gestión Usuarios</span>
+                </a>
+
+                <!-- Separador visual -->
+                <div class="border-t border-slate-700 my-3"></div>
+
+                <!-- Configuración -->
+                <a href="#" onclick="navigateTo('configuracion')"
+                   class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
+                          transition-all duration-200 hover:bg-slate-800 text-slate-300"
+                   data-section="configuracion">
+                    <i data-lucide="settings" class="w-5 h-5"></i>
+                    <span>Configuración</span>
+                </a>
+            </nav>
+
+                    <!-- Footer del sidebar -->
+                    <div class="px-4 py-4 border-t border-slate-700">
+                        <div class="flex items-center gap-3">
+                            <div id="sidebarUserAvatar" class="w-9 h-9 rounded-full bg-primary-600 flex items-center justify-center text-sm font-bold">
+                                AD
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <p id="sidebarUserName" class="text-sm font-medium truncate">Admin Demo</p>
+                                <p id="sidebarUserEmail" class="text-xs text-slate-400 truncate">admin@mps.cl</p>
+                            </div>
+                            <button onclick="logout()" class="text-slate-400 hover:text-white transition" title="Cerrar sesión">
+                                <i data-lucide="log-out" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+        </aside>
+
+        <!-- ========================================
+             ÁREA DE CONTENIDO PRINCIPAL
+             ======================================== -->
+        <div class="flex-1 min-w-0">
+
+            <!-- ====================================
+                 BARRA SUPERIOR (TOP BAR)
+                 ==================================== -->
+            <header class="sticky top-0 z-30 bg-white/80 backdrop-blur-lg border-b border-slate-200">
+                <div class="flex items-center justify-between px-4 sm:px-6 py-3">
+                    <!-- Botón hamburguesa (móvil) -->
+                    <button onclick="toggleSidebar()"
+                            class="lg:hidden p-2 rounded-lg hover:bg-slate-100 transition">
+                        <i data-lucide="menu" class="w-5 h-5 text-slate-600"></i>
+                    </button>
+
+                    <!-- Título de la sección actual -->
+                    <div class="flex-1 lg:flex-none ml-4 lg:ml-0">
+                        <h2 id="sectionTitle" class="text-lg font-semibold text-slate-800">
+                            Dashboard
+                        </h2>
+                        <p id="sectionSubtitle" class="text-xs text-slate-400 hidden sm:block">
+                            Bienvenido al sistema de gestión de impresión
+                        </p>
+                    </div>
+
+                    <!-- Acciones del header -->
+                    <div class="flex items-center gap-3">
+                        <!-- Notificaciones -->
+                        <button class="relative p-2 rounded-lg hover:bg-slate-100 transition">
+                            <i data-lucide="bell" class="w-5 h-5 text-slate-500"></i>
+                            <span class="absolute top-1.5 right-1.5 w-2 h-2 bg-danger-500 rounded-full"></span>
+                        </button>
+                        <!-- Búsqueda rápida -->
+                        <button class="p-2 rounded-lg hover:bg-slate-100 transition hidden sm:block">
+                            <i data-lucide="search" class="w-5 h-5 text-slate-500"></i>
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <!-- ====================================
+                 CONTENIDO: SECCIONES / MÓDULOS
+                 ==================================== -->
+            <main class="p-4 sm:p-6 lg:p-8">
+
+                <!-- ====================================================
+                     MÓDULO 1: DASHBOARD DE INDICADORES
+                     ==================================================== -->
+                <section id="section-dashboard" class="page-section active">
+
+                    <!-- Filtros superiores del Dashboard -->
+                    <div class="flex flex-wrap items-center gap-3 mb-6">
+                        <span class="text-sm font-medium text-slate-500">Rol activo:</span>
+                        <span id="dashboardRoleBadge"
+                              class="badge badge-active">
+                            🏢 Gerente General
+                        </span>
+                        <span class="text-xs text-slate-400 ml-auto">
+                            Última actualización: 19/07/2026 15:30
+                        </span>
+                    </div>
+
+                    <!-- ====== TARJETAS KPI ====== -->
+                    <div id="kpiGrid" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
+                        <!-- Las tarjetas KPI se renderizan dinámicamente con JS -->
+                    </div>
+
+                    <!-- ====== GRÁFICOS (PLACEHOLDERS VISUALES) ====== -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+
+                        <!-- Gráfico de Barras: Costo por Departamento -->
+                        <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+                            <div class="flex items-center justify-between mb-4">
+                                <div>
+                                    <h3 class="text-base font-semibold text-slate-800">
+                                        Costo por Departamento
+                                    </h3>
+                                    <p class="text-xs text-slate-400 mt-0.5">Último trimestre (en miles)</p>
+                                </div>
+                                <span class="text-xs font-medium text-success-600 bg-success-50 px-2 py-1 rounded-lg">
+                                    ↑ 12% vs anterior
+                                </span>
+                            </div>
+                            <!-- Simulación visual de gráfico de barras -->
+                            <div class="flex items-end justify-between gap-3 h-48 px-2">
+                                <!-- Eje Y simulado -->
+                                <div class="flex flex-col justify-between h-full text-xs text-slate-400 pb-1">
+                                    <span>150</span><span>120</span><span>90</span><span>60</span><span>30</span><span>0</span>
+                                </div>
+                                <!-- Barras -->
+                                <div class="flex-1 flex items-end justify-around gap-2 h-full border-b border-l border-slate-200 pl-2">
+                                    <div class="flex flex-col items-center gap-1 flex-1">
+                                        <div class="chart-bar w-full max-w-10 bg-primary-500 rounded-t-md"
+                                             style="height: 75%;"></div>
+                                        <span class="text-[10px] text-slate-500 font-medium">Admin</span>
+                                    </div>
+                                    <div class="flex flex-col items-center gap-1 flex-1">
+                                        <div class="chart-bar w-full max-w-10 bg-primary-600 rounded-t-md"
+                                             style="height: 100%;"></div>
+                                        <span class="text-[10px] text-slate-500 font-medium">Ventas</span>
+                                    </div>
+                                    <div class="flex flex-col items-center gap-1 flex-1">
+                                        <div class="chart-bar w-full max-w-10 bg-primary-400 rounded-t-md"
+                                             style="height: 50%;"></div>
+                                        <span class="text-[10px] text-slate-500 font-medium">RRHH</span>
+                                    </div>
+                                    <div class="flex flex-col items-center gap-1 flex-1">
+                                        <div class="chart-bar w-full max-w-10 bg-primary-700 rounded-t-md"
+                                             style="height: 90%;"></div>
+                                        <span class="text-[10px] text-slate-500 font-medium">Contab.</span>
+                                    </div>
+                                    <div class="flex flex-col items-center gap-1 flex-1">
+                                        <div class="chart-bar w-full max-w-10 bg-primary-300 rounded-t-md"
+                                             style="height: 35%;"></div>
+                                        <span class="text-[10px] text-slate-500 font-medium">Bodega</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Gráfico de Línea: Predicción de Consumo -->
+                        <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+                            <div class="flex items-center justify-between mb-4">
+                                <div>
+                                    <h3 class="text-base font-semibold text-slate-800">
+                                        Predicción de Consumo de Tóner
+                                    </h3>
+                                    <p class="text-xs text-slate-400 mt-0.5">Próximos 6 meses (toneladas)</p>
+                                </div>
+                                <span class="text-xs font-medium text-warning-600 bg-warning-50 px-2 py-1 rounded-lg">
+                                    ⚠ Tendencia ascendente
+                                </span>
+                            </div>
+                            <!-- Simulación visual de gráfico de líneas -->
+                            <div class="relative h-48 px-2">
+                                <svg viewBox="0 0 500 180" class="w-full h-full" preserveAspectRatio="none">
+                                    <!-- Grid de fondo -->
+                                    <line x1="50" y1="10" x2="50" y2="160" stroke="#e2e8f0" stroke-width="1"/>
+                                    <line x1="50" y1="160" x2="490" y2="160" stroke="#e2e8f0" stroke-width="1"/>
+                                    <!-- Líneas de referencia horizontales -->
+                                    <line x1="50" y1="40" x2="490" y2="40" stroke="#f1f5f9" stroke-width="1" stroke-dasharray="4"/>
+                                    <line x1="50" y1="70" x2="490" y2="70" stroke="#f1f5f9" stroke-width="1" stroke-dasharray="4"/>
+                                    <line x1="50" y1="100" x2="490" y2="100" stroke="#f1f5f9" stroke-width="1" stroke-dasharray="4"/>
+                                    <line x1="50" y1="130" x2="490" y2="130" stroke="#f1f5f9" stroke-width="1" stroke-dasharray="4"/>
+
+                                    <!-- Área bajo la curva -->
+                                    <path d="M80,120 L160,100 L240,110 L320,80 L400,50 L480,35 L480,160 L80,160 Z"
+                                          fill="url(#gradientArea)" opacity="0.3"/>
+
+                                    <!-- Línea principal -->
+                                    <polyline points="80,120 160,100 240,110 320,80 400,50 480,35"
+                                              fill="none" stroke="#3b82f6" stroke-width="3"
+                                              stroke-linecap="round" stroke-linejoin="round"
+                                              class="chart-line"/>
+
+                                    <!-- Línea de predicción (punteada) -->
+                                    <polyline points="320,80 400,50 480,35"
+                                              fill="none" stroke="#f59e0b" stroke-width="2"
+                                              stroke-dasharray="8,4"
+                                              stroke-linecap="round"/>
+
+                                    <!-- Puntos en los datos -->
+                                    <circle cx="80" cy="120" r="5" fill="#3b82f6"/>
+                                    <circle cx="160" cy="100" r="5" fill="#3b82f6"/>
+                                    <circle cx="240" cy="110" r="5" fill="#3b82f6"/>
+                                    <circle cx="320" cy="80" r="5" fill="#3b82f6"/>
+                                    <circle cx="400" cy="50" r="5" fill="#3b82f6"/>
+                                    <circle cx="480" cy="35" r="5" fill="#f59e0b"/>
+
+                                    <!-- Labels del eje X -->
+                                    <text x="80" y="175" text-anchor="middle" fill="#94a3b8" font-size="10">Ene</text>
+                                    <text x="160" y="175" text-anchor="middle" fill="#94a3b8" font-size="10">Feb</text>
+                                    <text x="240" y="175" text-anchor="middle" fill="#94a3b8" font-size="10">Mar</text>
+                                    <text x="320" y="175" text-anchor="middle" fill="#94a3b8" font-size="10">Abr</text>
+                                    <text x="400" y="175" text-anchor="middle" fill="#94a3b8" font-size="10">May</text>
+                                    <text x="480" y="175" text-anchor="middle" fill="#94a3b8" font-size="10">Jun</text>
+
+                                    <!-- Gradiente -->
+                                    <defs>
+                                        <linearGradient id="gradientArea" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.4"/>
+                                            <stop offset="100%" stop-color="#3b82f6" stop-opacity="0.0"/>
+                                        </linearGradient>
+                                    </defs>
+                                </svg>
+                                <!-- Leyenda -->
+                                <div class="flex items-center gap-4 mt-2 justify-center">
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="w-3 h-0.5 bg-primary-500 rounded-full inline-block"></span>
+                                        <span class="text-[10px] text-slate-500">Consumo Real</span>
+                                    </div>
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="w-3 h-0.5 bg-warning-500 rounded-full inline-block"
+                                              style="border-top: 2px dashed #f59e0b; height:0;"></span>
+                                        <span class="text-[10px] text-slate-500">Predicción</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ====== TABLA RESUMEN: Últimos Registros ====== -->
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
+                        <div class="px-6 py-4 border-b border-slate-100">
+                            <h3 class="text-base font-semibold text-slate-800">Últimos Registros Operativos</h3>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="w-full text-sm">
+                                <thead>
+                                    <tr class="border-b border-slate-100 bg-slate-50">
+                                        <th class="text-left px-6 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wider">Fecha</th>
+                                        <th class="text-left px-6 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wider">Técnico</th>
+                                        <th class="text-left px-6 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wider">Cliente</th>
+                                        <th class="text-left px-6 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wider">Equipo</th>
+                                        <th class="text-left px-6 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wider">Tipo</th>
+                                        <th class="text-right px-6 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wider">Costo</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr class="border-b border-slate-50 hover:bg-slate-50/50 transition">
+                                        <td class="px-6 py-3.5 text-slate-600">18/07/2026</td>
+                                        <td class="px-6 py-3.5 font-medium text-slate-700">Carlos Mendoza</td>
+                                        <td class="px-6 py-3.5 text-slate-600">SpA Logística</td>
+                                        <td class="px-6 py-3.5 font-mono text-xs text-slate-500">HP-LJ-4520</td>
+                                        <td class="px-6 py-3.5">
+                                            <span class="badge badge-repair">Correctiva</span>
+                                        </td>
+                                        <td class="px-6 py-3.5 text-right font-semibold text-slate-700">$45.000</td>
+                                    </tr>
+                                    <tr class="border-b border-slate-50 hover:bg-slate-50/50 transition">
+                                        <td class="px-6 py-3.5 text-slate-600">17/07/2026</td>
+                                        <td class="px-6 py-3.5 font-medium text-slate-700">Ana Silva</td>
+                                        <td class="px-6 py-3.5 text-slate-600">Constructora XYZ</td>
+                                        <td class="px-6 py-3.5 font-mono text-xs text-slate-500">EP-4750-A</td>
+                                        <td class="px-6 py-3.5">
+                                            <span class="badge badge-active">Preventiva</span>
+                                        </td>
+                                        <td class="px-6 py-3.5 text-right font-semibold text-slate-700">$0</td>
+                                    </tr>
+                                    <tr class="border-b border-slate-50 hover:bg-slate-50/50 transition">
+                                        <td class="px-6 py-3.5 text-slate-600">16/07/2026</td>
+                                        <td class="px-6 py-3.5 font-medium text-slate-700">Carlos Mendoza</td>
+                                        <td class="px-6 py-3.5 text-slate-600">Empresa ABC</td>
+                                        <td class="px-6 py-3.5 font-mono text-xs text-slate-500">BR-M428-DW</td>
+                                        <td class="px-6 py-3.5">
+                                            <span class="badge badge-repair">Correctiva</span>
+                                        </td>
+                                        <td class="px-6 py-3.5 text-right font-semibold text-slate-700">$120.000</td>
+                                    </tr>
+                                    <tr class="hover:bg-slate-50/50 transition">
+                                        <td class="px-6 py-3.5 text-slate-600">15/07/2026</td>
+                                        <td class="px-6 py-3.5 font-medium text-slate-700">Pedro Rojas</td>
+                                        <td class="px-6 py-3.5 text-slate-600">SpA Logística</td>
+                                        <td class="px-6 py-3.5 font-mono text-xs text-slate-500">SN-5732-N</td>
+                                        <td class="px-6 py-3.5">
+                                            <span class="badge badge-active">Preventiva</span>
+                                        </td>
+                                        <td class="px-6 py-3.5 text-right font-semibold text-slate-700">$0</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+
+                <!-- ====================================================
+                     MÓDULO 2: GESTIÓN MULTICLIENTE Y USUARIOS
+                     ==================================================== -->
+                <section id="section-clientes" class="page-section">
+
+                    <!-- Selector de Cliente Actual -->
+                    <div class="flex flex-wrap items-center gap-3 mb-6">
+                        <label class="text-sm font-medium text-slate-500">Cliente Actual:</label>
+                        <select id="currentClient"
+                                class="bg-white border border-slate-300 rounded-lg px-4 py-2.5 text-sm
+                                       font-medium text-slate-700 focus:ring-2 focus:ring-primary-500
+                                       focus:border-primary-500 outline-none shadow-sm">
+                            <option value="all">📋 Todos los clientes</option>
+                        </select>
+                        <button onclick="toggleClientForm()"
+                                class="ml-auto bg-primary-600 hover:bg-primary-700 text-white text-sm
+                                       font-semibold px-4 py-2.5 rounded-lg shadow-sm transition
+                                       flex items-center gap-2">
+                            <i data-lucide="plus" class="w-4 h-4"></i>
+                            <span class="hidden sm:inline">Nuevo Cliente</span>
+                        </button>
+                    </div>
+
+                    <!-- ====== FORMULARIO DE CLIENTE (colapsable) ====== -->
+                    <div id="clientForm" class="hidden bg-white rounded-2xl border border-slate-200 shadow-sm mb-6">
+                        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                            <h3 class="text-base font-semibold text-slate-800">
+                                <span id="clientFormTitle">Registrar Nuevo Cliente</span>
+                            </h3>
+                            <button onclick="toggleClientForm()" class="text-slate-400 hover:text-slate-600 transition">
+                                <i data-lucide="x" class="w-5 h-5"></i>
+                            </button>
+                        </div>
+                        <form id="clientFormEl" class="p-6" onsubmit="return false;">
+                            <input type="hidden" id="clienteIdEdit" value="">
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                                <!-- RUT -->
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-600 mb-1.5">
+                                        RUT <span class="text-danger-500">*</span>
+                                    </label>
+                                    <input type="text" id="clienteRut" placeholder="76.123.456-7"
+                                           class="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm
+                                                  placeholder:text-slate-300 focus:ring-2 focus:ring-primary-500
+                                                  focus:border-primary-500 outline-none transition">
+                                </div>
+                                <!-- Razón Social -->
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-600 mb-1.5">
+                                        Razón Social <span class="text-danger-500">*</span>
+                                    </label>
+                                    <input type="text" id="clienteRazonSocial" placeholder="Empresa Ejemplo SpA"
+                                           class="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm
+                                                  placeholder:text-slate-300 focus:ring-2 focus:ring-primary-500
+                                                  focus:border-primary-500 outline-none transition">
+                                </div>
+                                <!-- Dirección -->
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-600 mb-1.5">
+                                        Dirección
+                                    </label>
+                                    <input type="text" id="clienteDireccion" placeholder="Av. Principal 1234, Of. 501"
+                                           class="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm
+                                                  placeholder:text-slate-300 focus:ring-2 focus:ring-primary-500
+                                                  focus:border-primary-500 outline-none transition">
+                                </div>
+                                <!-- Teléfono -->
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-600 mb-1.5">
+                                        Teléfono
+                                    </label>
+                                    <input type="tel" id="clienteTelefono" placeholder="+56 9 1234 5678"
+                                           class="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm
+                                                  placeholder:text-slate-300 focus:ring-2 focus:ring-primary-500
+                                                  focus:border-primary-500 outline-none transition">
+                                </div>
+                                <!-- Nombre de Contacto -->
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-600 mb-1.5">
+                                        Nombre de Contacto <span class="text-danger-500">*</span>
+                                    </label>
+                                    <input type="text" id="clienteContacto" placeholder="Juan Pérez"
+                                           class="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm
+                                                  placeholder:text-slate-300 focus:ring-2 focus:ring-primary-500
+                                                  focus:border-primary-500 outline-none transition">
+                                </div>
+                                <!-- Email Contacto -->
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-600 mb-1.5">
+                                        Email Contacto
+                                    </label>
+                                    <input type="email" id="clienteEmail" placeholder="contacto@empresa.cl"
+                                           class="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm
+                                                  placeholder:text-slate-300 focus:ring-2 focus:ring-primary-500
+                                                  focus:border-primary-500 outline-none transition">
+                                </div>
+                            </div>
+                            <!-- Botones de acción -->
+                            <div class="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-slate-100">
+                                <button type="button" onclick="toggleClientForm()"
+                                        class="px-4 py-2.5 text-sm font-medium text-slate-600 bg-slate-100
+                                               hover:bg-slate-200 rounded-lg transition">
+                                    Cancelar
+                                </button>
+                                <button type="button" onclick="guardarCliente()"
+                                        class="px-5 py-2.5 text-sm font-semibold text-white bg-primary-600
+                                               hover:bg-primary-700 rounded-lg shadow-sm transition">
+                                    Guardar Cliente
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- ====== TABLA DE CLIENTES ====== -->
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
+                        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                            <h3 class="text-base font-semibold text-slate-800">
+                                Clientes Registrados
+                                <span class="text-sm font-normal text-slate-400 ml-2">(4)</span>
+                            </h3>
+                            <div class="relative">
+                                <input type="text" placeholder="Buscar cliente..."
+                                       class="border border-slate-200 rounded-lg pl-9 pr-3 py-2 text-sm
+                                              focus:ring-2 focus:ring-primary-500 focus:border-primary-500
+                                              outline-none w-48 sm:w-56">
+                                <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+                            </div>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="w-full text-sm">
+                                <thead>
+                                    <tr class="border-b border-slate-100 bg-slate-50">
+                                        <th class="text-left px-6 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wider">RUT</th>
+                                        <th class="text-left px-6 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wider">Razón Social</th>
+                                        <th class="text-left px-6 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wider hidden md:table-cell">Contacto</th>
+                                        <th class="text-left px-6 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wider hidden lg:table-cell">Teléfono</th>
+                                        <th class="text-left px-6 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wider hidden xl:table-cell">Impresoras</th>
+                                        <th class="text-center px-6 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wider">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr class="border-b border-slate-50 hover:bg-slate-50/50 transition">
+                                        <td class="px-6 py-3.5 font-mono text-xs text-slate-500">76.111.222-3</td>
+                                        <td class="px-6 py-3.5 font-medium text-slate-700">Empresa ABC SpA</td>
+                                        <td class="px-6 py-3.5 text-slate-600 hidden md:table-cell">Juan Pérez</td>
+                                        <td class="px-6 py-3.5 text-slate-500 hidden lg:table-cell">+56 9 8765 4321</td>
+                                        <td class="px-6 py-3.5 hidden xl:table-cell">
+                                            <span class="inline-flex items-center gap-1 bg-primary-50 text-primary-700 px-2 py-0.5 rounded-md text-xs font-semibold">
+                                                <i data-lucide="printer" class="w-3 h-3"></i> 5
+                                            </span>
+                                        </td>
+                                        <td class="px-6 py-3.5 text-center">
+                                            <div class="flex items-center justify-center gap-1">
+                                                <button class="p-1.5 rounded-lg hover:bg-primary-50 text-primary-600 transition"
+                                                        title="Editar">
+                                                    <i data-lucide="pencil" class="w-4 h-4"></i>
+                                                </button>
+                                                <button class="p-1.5 rounded-lg hover:bg-danger-50 text-danger-500 transition"
+                                                        title="Eliminar">
+                                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr class="border-b border-slate-50 hover:bg-slate-50/50 transition">
+                                        <td class="px-6 py-3.5 font-mono text-xs text-slate-500">76.333.444-5</td>
+                                        <td class="px-6 py-3.5 font-medium text-slate-700">Constructora XYZ Ltda.</td>
+                                        <td class="px-6 py-3.5 text-slate-600 hidden md:table-cell">María López</td>
+                                        <td class="px-6 py-3.5 text-slate-500 hidden lg:table-cell">+56 9 7777 8888</td>
+                                        <td class="px-6 py-3.5 hidden xl:table-cell">
+                                            <span class="inline-flex items-center gap-1 bg-primary-50 text-primary-700 px-2 py-0.5 rounded-md text-xs font-semibold">
+                                                <i data-lucide="printer" class="w-3 h-3"></i> 3
+                                            </span>
+                                        </td>
+                                        <td class="px-6 py-3.5 text-center">
+                                            <div class="flex items-center justify-center gap-1">
+                                                <button class="p-1.5 rounded-lg hover:bg-primary-50 text-primary-600 transition"
+                                                        title="Editar">
+                                                    <i data-lucide="pencil" class="w-4 h-4"></i>
+                                                </button>
+                                                <button class="p-1.5 rounded-lg hover:bg-danger-50 text-danger-500 transition"
+                                                        title="Eliminar">
+                                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr class="border-b border-slate-50 hover:bg-slate-50/50 transition">
+                                        <td class="px-6 py-3.5 font-mono text-xs text-slate-500">76.555.666-7</td>
+                                        <td class="px-6 py-3.5 font-medium text-slate-700">SpA Logística Norte</td>
+                                        <td class="px-6 py-3.5 text-slate-600 hidden md:table-cell">Pedro Rojas</td>
+                                        <td class="px-6 py-3.5 text-slate-500 hidden lg:table-cell">+56 9 6666 5555</td>
+                                        <td class="px-6 py-3.5 hidden xl:table-cell">
+                                            <span class="inline-flex items-center gap-1 bg-primary-50 text-primary-700 px-2 py-0.5 rounded-md text-xs font-semibold">
+                                                <i data-lucide="printer" class="w-3 h-3"></i> 8
+                                            </span>
+                                        </td>
+                                        <td class="px-6 py-3.5 text-center">
+                                            <div class="flex items-center justify-center gap-1">
+                                                <button class="p-1.5 rounded-lg hover:bg-primary-50 text-primary-600 transition"
+                                                        title="Editar">
+                                                    <i data-lucide="pencil" class="w-4 h-4"></i>
+                                                </button>
+                                                <button class="p-1.5 rounded-lg hover:bg-danger-50 text-danger-500 transition"
+                                                        title="Eliminar">
+                                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr class="hover:bg-slate-50/50 transition">
+                                        <td class="px-6 py-3.5 font-mono text-xs text-slate-500">76.789.012-3</td>
+                                        <td class="px-6 py-3.5 font-medium text-slate-700">Clínica Salud Total</td>
+                                        <td class="px-6 py-3.5 text-slate-600 hidden md:table-cell">Ana García</td>
+                                        <td class="px-6 py-3.5 text-slate-500 hidden lg:table-cell">+56 9 5555 4444</td>
+                                        <td class="px-6 py-3.5 hidden xl:table-cell">
+                                            <span class="inline-flex items-center gap-1 bg-primary-50 text-primary-700 px-2 py-0.5 rounded-md text-xs font-semibold">
+                                                <i data-lucide="printer" class="w-3 h-3"></i> 12
+                                            </span>
+                                        </td>
+                                        <td class="px-6 py-3.5 text-center">
+                                            <div class="flex items-center justify-center gap-1">
+                                                <button class="p-1.5 rounded-lg hover:bg-primary-50 text-primary-600 transition"
+                                                        title="Editar">
+                                                    <i data-lucide="pencil" class="w-4 h-4"></i>
+                                                </button>
+                                                <button class="p-1.5 rounded-lg hover:bg-danger-50 text-danger-500 transition"
+                                                        title="Eliminar">
+                                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <!-- Paginación -->
+                        <div class="px-6 py-3 border-t border-slate-100 flex items-center justify-between text-sm">
+                            <span class="text-slate-400">Mostrando 1-4 de 4 clientes</span>
+                            <div class="flex items-center gap-1">
+                                <button class="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-400 cursor-not-allowed">Anterior</button>
+                                <button class="px-3 py-1.5 rounded-lg bg-primary-600 text-white font-semibold">1</button>
+                                <button class="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-400 cursor-not-allowed">Siguiente</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+
+                <!-- ====================================================
+                     MÓDULO 3: PARQUE DE IMPRESORAS Y SUMINISTROS
+                     ==================================================== -->
+                <section id="section-impresoras" class="page-section">
+
+                    <!-- ====== FORMULARIO DE INGRESO DE EQUIPOS ====== -->
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm mb-6">
+                        <div class="px-6 py-4 border-b border-slate-100">
+                            <h3 class="text-base font-semibold text-slate-800 flex items-center gap-2">
+                                <i data-lucide="plus-circle" class="w-5 h-5 text-primary-500"></i>
+                                Registrar Nuevo Equipo
+                            </h3>
+                        </div>
+                        <form class="p-6" onsubmit="return false;">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+                                <!-- Número de Serie -->
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-600 mb-1.5">
+                                        Número de Serie <span class="text-danger-500">*</span>
+                                    </label>
+                                    <input type="text" placeholder="VNB4-231001A"
+                                           class="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm
+                                                  font-mono placeholder:text-slate-300 focus:ring-2 focus:ring-primary-500
+                                                  focus:border-primary-500 outline-none transition">
+                                </div>
+                                <!-- Marca -->
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-600 mb-1.5">
+                                        Marca <span class="text-danger-500">*</span>
+                                    </label>
+                                    <select class="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm
+                                                   text-slate-700 focus:ring-2 focus:ring-primary-500
+                                                   focus:border-primary-500 outline-none transition cursor-pointer">
+                                        <option value="">Seleccionar marca</option>
+                                        <option value="hp">HP</option>
+                                        <option value="brother">Brother</option>
+                                        <option value="epson">Epson</option>
+                                        <option value="canon">Canon</option>
+                                        <option value="samsung">Samsung</option>
+                                        <option value="kyocera">Kyocera</option>
+                                        <option value="xerox">Xerox</option>
+                                    </select>
+                                </div>
+                                <!-- Modelo -->
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-600 mb-1.5">
+                                        Modelo <span class="text-danger-500">*</span>
+                                    </label>
+                                    <input type="text" placeholder="LaserJet Pro M404dn"
+                                           class="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm
+                                                  placeholder:text-slate-300 focus:ring-2 focus:ring-primary-500
+                                                  focus:border-primary-500 outline-none transition">
+                                </div>
+                                <!-- Tipo Conexión -->
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-600 mb-1.5">
+                                        Tipo de Conexión
+                                    </label>
+                                    <select class="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm
+                                                   text-slate-700 focus:ring-2 focus:ring-primary-500
+                                                   focus:border-primary-500 outline-none transition cursor-pointer">
+                                        <option value="usb">🔌 USB</option>
+                                        <option value="lan" selected>🌐 LAN (Ethernet)</option>
+                                        <option value="wifi">📶 Wi-Fi</option>
+                                        <option value="usb-lan">🔌🌐 USB + LAN</option>
+                                    </select>
+                                </div>
+                                <!-- IP -->
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-600 mb-1.5">
+                                        Dirección IP
+                                    </label>
+                                    <input type="text" placeholder="192.168.1.100"
+                                           class="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm
+                                                  font-mono placeholder:text-slate-300 focus:ring-2 focus:ring-primary-500
+                                                  focus:border-primary-500 outline-none transition">
+                                </div>
+                                <!-- MAC -->
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-600 mb-1.5">
+                                        Dirección MAC
+                                    </label>
+                                    <input type="text" placeholder="AA:BB:CC:DD:EE:FF"
+                                           class="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm
+                                                  font-mono placeholder:text-slate-300 focus:ring-2 focus:ring-primary-500
+                                                  focus:border-primary-500 outline-none transition">
+                                </div>
+                                <!-- Firmware -->
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-600 mb-1.5">
+                                        Versión de Firmware
+                                    </label>
+                                    <input type="text" placeholder="v3.62.01"
+                                           class="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm
+                                                  font-mono placeholder:text-slate-300 focus:ring-2 focus:ring-primary-500
+                                                  focus:border-primary-500 outline-none transition">
+                                </div>
+                                <!-- Fecha Compra -->
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-600 mb-1.5">
+                                        Fecha de Compra
+                                    </label>
+                                    <input type="date"
+                                           class="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm
+                                                  text-slate-700 focus:ring-2 focus:ring-primary-500
+                                                  focus:border-primary-500 outline-none transition">
+                                </div>
+                                <!-- Fecha Término Garantía -->
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-600 mb-1.5">
+                                        Término de Garantía
+                                    </label>
+                                    <input type="date"
+                                           class="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm
+                                                  text-slate-700 focus:ring-2 focus:ring-primary-500
+                                                  focus:border-primary-500 outline-none transition">
+                                </div>
+                                <!-- Cliente Asociado -->
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-600 mb-1.5">
+                                        Cliente Asociado
+                                    </label>
+                                    <select class="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm
+                                                   text-slate-700 focus:ring-2 focus:ring-primary-500
+                                                   focus:border-primary-500 outline-none transition cursor-pointer">
+                                        <option value="">Seleccionar cliente</option>
+                                        <option value="abc">Empresa ABC SpA</option>
+                                        <option value="xyz">Constructora XYZ Ltda.</option>
+                                        <option value="logistica">SpA Logística Norte</option>
+                                        <option value="salud">Clínica Salud Total</option>
+                                    </select>
+                                </div>
+                                <!-- Ubicación -->
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-600 mb-1.5">
+                                        Ubicación / Piso
+                                    </label>
+                                    <input type="text" placeholder="Piso 3, Sala de Reuniones"
+                                           class="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm
+                                                  placeholder:text-slate-300 focus:ring-2 focus:ring-primary-500
+                                                  focus:border-primary-500 outline-none transition">
+                                </div>
+                            </div>
+                            <!-- Botones -->
+                            <div class="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-slate-100">
+                                <button type="button"
+                                        class="px-4 py-2.5 text-sm font-medium text-slate-600 bg-slate-100
+                                               hover:bg-slate-200 rounded-lg transition">
+                                    Limpiar
+                                </button>
+                                <button type="submit"
+                                        class="px-5 py-2.5 text-sm font-semibold text-white bg-primary-600
+                                               hover:bg-primary-700 rounded-lg shadow-sm transition
+                                               flex items-center gap-2">
+                                    <i data-lucide="save" class="w-4 h-4"></i>
+                                    Registrar Equipo
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- ====== LISTA DEL PARQUE DE EQUIPOS ====== -->
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
+                        <div class="px-6 py-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
+                            <h3 class="text-base font-semibold text-slate-800">
+                                Parque de Equipos
+                                <span class="text-sm font-normal text-slate-400 ml-2">(8 equipos)</span>
+                            </h3>
+                            <div class="flex items-center gap-2">
+                                <!-- Filtro de estado -->
+                                <select class="border border-slate-200 rounded-lg px-3 py-2 text-sm
+                                               focus:ring-2 focus:ring-primary-500 outline-none cursor-pointer">
+                                    <option value="all">Todos los estados</option>
+                                    <option value="active">✅ Activos</option>
+                                    <option value="repair">🔧 En Reparación</option>
+                                    <option value="down">❌ De Baja</option>
+                                </select>
+                                <button class="p-2 rounded-lg hover:bg-slate-100 transition" title="Exportar">
+                                    <i data-lucide="download" class="w-4 h-4 text-slate-500"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="w-full text-sm">
+                                <thead>
+                                    <tr class="border-b border-slate-100 bg-slate-50">
+                                        <th class="text-left px-4 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wider">Serie</th>
+                                        <th class="text-left px-4 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wider">Equipo</th>
+                                        <th class="text-left px-4 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wider hidden md:table-cell">Cliente</th>
+                                        <th class="text-left px-4 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wider hidden lg:table-cell">Conexión</th>
+                                        <th class="text-left px-4 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wider">Estado</th>
+                                        <th class="text-left px-4 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wider">Garantía</th>
+                                        <th class="text-center px-4 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wider">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Equipo 1 -->
+                                    <tr class="border-b border-slate-50 hover:bg-slate-50/50 transition impresora-row" data-page="1">
+                                        <td class="px-4 py-3.5 font-mono text-xs text-slate-500">VNB4-231001A</td>
+                                        <td class="px-4 py-3.5">
+                                            <div class="font-medium text-slate-700">HP LaserJet Pro M404dn</div>
+                                            <div class="text-xs text-slate-400 md:hidden">Empresa ABC</div>
+                                        </td>
+                                        <td class="px-4 py-3.5 text-slate-600 hidden md:table-cell">Empresa ABC SpA</td>
+                                        <td class="px-4 py-3.5 hidden lg:table-cell">
+                                            <span class="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-medium">LAN</span>
+                                        </td>
+                                        <td class="px-4 py-3.5"><span class="badge badge-active">✅ Activo</span></td>
+                                        <td class="px-4 py-3.5"><span class="badge badge-warranty">🛡️ Vigente</span></td>
+                                        <td class="px-4 py-3.5 text-center">
+                                            <div class="flex items-center justify-center gap-1">
+                                                <button onclick="verImpresora(1)" class="p-1.5 rounded-lg hover:bg-primary-50 text-primary-600 transition" title="Ver detalle">
+                                                    <i data-lucide="eye" class="w-4 h-4"></i>
+                                                </button>
+                                                <button onclick="editarImpresora(1)" class="p-1.5 rounded-lg hover:bg-primary-50 text-primary-600 transition" title="Editar">
+                                                    <i data-lucide="pencil" class="w-4 h-4"></i>
+                                                </button>
+                                                <button onclick="eliminarImpresora(1, 'HP LaserJet Pro M404dn')" class="p-1.5 rounded-lg hover:bg-danger-50 text-danger-500 transition" title="Eliminar">
+                                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <!-- Equipo 2 -->
+                                    <tr class="border-b border-slate-50 hover:bg-slate-50/50 transition impresora-row" data-page="1">
+                                        <td class="px-4 py-3.5 font-mono text-xs text-slate-500">EP-4750-A</td>
+                                        <td class="px-4 py-3.5">
+                                            <div class="font-medium text-slate-700">Epson EcoTank L4750</div>
+                                            <div class="text-xs text-slate-400 md:hidden">Constructora XYZ</div>
+                                        </td>
+                                        <td class="px-4 py-3.5 text-slate-600 hidden md:table-cell">Constructora XYZ Ltda.</td>
+                                        <td class="px-4 py-3.5 hidden lg:table-cell">
+                                            <span class="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-medium">Wi-Fi</span>
+                                        </td>
+                                        <td class="px-4 py-3.5"><span class="badge badge-active">✅ Activo</span></td>
+                                        <td class="px-4 py-3.5"><span class="badge badge-expired">⚠️ Vencida</span></td>
+                                        <td class="px-4 py-3.5 text-center">
+                                            <div class="flex items-center justify-center gap-1">
+                                                <button onclick="verImpresora(2)" class="p-1.5 rounded-lg hover:bg-primary-50 text-primary-600 transition" title="Ver detalle">
+                                                    <i data-lucide="eye" class="w-4 h-4"></i>
+                                                </button>
+                                                <button onclick="editarImpresora(2)" class="p-1.5 rounded-lg hover:bg-primary-50 text-primary-600 transition" title="Editar">
+                                                    <i data-lucide="pencil" class="w-4 h-4"></i>
+                                                </button>
+                                                <button onclick="eliminarImpresora(2, 'Epson EcoTank L4750')" class="p-1.5 rounded-lg hover:bg-danger-50 text-danger-500 transition" title="Eliminar">
+                                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <!-- Equipo 3 -->
+                                    <tr class="border-b border-slate-50 hover:bg-slate-50/50 transition impresora-row" data-page="1">
+                                        <td class="px-4 py-3.5 font-mono text-xs text-slate-500">BR-M428-DW</td>
+                                        <td class="px-4 py-3.5">
+                                            <div class="font-medium text-slate-700">Brother MFC-L4280DW</div>
+                                            <div class="text-xs text-slate-400 md:hidden">Empresa ABC</div>
+                                        </td>
+                                        <td class="px-4 py-3.5 text-slate-600 hidden md:table-cell">Empresa ABC SpA</td>
+                                        <td class="px-4 py-3.5 hidden lg:table-cell">
+                                            <span class="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-medium">USB</span>
+                                        </td>
+                                        <td class="px-4 py-3.5"><span class="badge badge-repair">🔧 En Reparación</span></td>
+                                        <td class="px-4 py-3.5"><span class="badge badge-warranty">🛡️ Vigente</span></td>
+                                        <td class="px-4 py-3.5 text-center">
+                                            <div class="flex items-center justify-center gap-1">
+                                                <button onclick="verImpresora(3)" class="p-1.5 rounded-lg hover:bg-primary-50 text-primary-600 transition" title="Ver detalle">
+                                                    <i data-lucide="eye" class="w-4 h-4"></i>
+                                                </button>
+                                                <button onclick="editarImpresora(3)" class="p-1.5 rounded-lg hover:bg-primary-50 text-primary-600 transition" title="Editar">
+                                                    <i data-lucide="pencil" class="w-4 h-4"></i>
+                                                </button>
+                                                <button onclick="eliminarImpresora(3, 'Brother MFC-L4280DW')" class="p-1.5 rounded-lg hover:bg-danger-50 text-danger-500 transition" title="Eliminar">
+                                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <!-- Equipo 4 -->
+                                    <tr class="border-b border-slate-50 hover:bg-slate-50/50 transition impresora-row" data-page="1">
+                                        <td class="px-4 py-3.5 font-mono text-xs text-slate-500">SN-5732-N</td>
+                                        <td class="px-4 py-3.5">
+                                            <div class="font-medium text-slate-700">Samsung SL-M5732FN</div>
+                                            <div class="text-xs text-slate-400 md:hidden">SpA Logística</div>
+                                        </td>
+                                        <td class="px-4 py-3.5 text-slate-600 hidden md:table-cell">SpA Logística Norte</td>
+                                        <td class="px-4 py-3.5 hidden lg:table-cell">
+                                            <span class="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-medium">LAN</span>
+                                        </td>
+                                        <td class="px-4 py-3.5"><span class="badge badge-active">✅ Activo</span></td>
+                                        <td class="px-4 py-3.5"><span class="badge badge-warranty">🛡️ Vigente</span></td>
+                                        <td class="px-4 py-3.5 text-center">
+                                            <div class="flex items-center justify-center gap-1">
+                                                <button onclick="verImpresora(4)" class="p-1.5 rounded-lg hover:bg-primary-50 text-primary-600 transition" title="Ver detalle">
+                                                    <i data-lucide="eye" class="w-4 h-4"></i>
+                                                </button>
+                                                <button onclick="editarImpresora(4)" class="p-1.5 rounded-lg hover:bg-primary-50 text-primary-600 transition" title="Editar">
+                                                    <i data-lucide="pencil" class="w-4 h-4"></i>
+                                                </button>
+                                                <button onclick="eliminarImpresora(4, 'Samsung SL-M5732FN')" class="p-1.5 rounded-lg hover:bg-danger-50 text-danger-500 transition" title="Eliminar">
+                                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <!-- Equipo 5 -->
+                                    <tr class="hover:bg-slate-50/50 transition impresora-row" data-page="1">
+                                        <td class="px-4 py-3.5 font-mono text-xs text-slate-500">KY-M4035</td>
+                                        <td class="px-4 py-3.5">
+                                            <div class="font-medium text-slate-700">Kyocera ECOSYS M4035idn</div>
+                                            <div class="text-xs text-slate-400 md:hidden">Clínica Salud</div>
+                                        </td>
+                                        <td class="px-4 py-3.5 text-slate-600 hidden md:table-cell">Clínica Salud Total</td>
+                                        <td class="px-4 py-3.5 hidden lg:table-cell">
+                                            <span class="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-medium">LAN</span>
+                                        </td>
+                                        <td class="px-4 py-3.5"><span class="badge badge-down">❌ De Baja</span></td>
+                                        <td class="px-4 py-3.5"><span class="badge badge-expired">⚠️ Vencida</span></td>
+                                        <td class="px-4 py-3.5 text-center">
+                                            <div class="flex items-center justify-center gap-1">
+                                                <button onclick="verImpresora(5)" class="p-1.5 rounded-lg hover:bg-primary-50 text-primary-600 transition" title="Ver detalle">
+                                                    <i data-lucide="eye" class="w-4 h-4"></i>
+                                                </button>
+                                                <button onclick="editarImpresora(5)" class="p-1.5 rounded-lg hover:bg-primary-50 text-primary-600 transition" title="Editar">
+                                                    <i data-lucide="pencil" class="w-4 h-4"></i>
+                                                </button>
+                                                <button onclick="eliminarImpresora(5, 'Kyocera ECOSYS M4035idn')" class="p-1.5 rounded-lg hover:bg-danger-50 text-danger-500 transition" title="Eliminar">
+                                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <!-- Equipo 6 -->
+                                    <tr class="border-b border-slate-50 hover:bg-slate-50/50 transition impresora-row" data-page="2">
+                                        <td class="px-4 py-3.5 font-mono text-xs text-slate-500">XL-8902-B</td>
+                                        <td class="px-4 py-3.5">
+                                            <div class="font-medium text-slate-700">Xerox WorkCentre 6515</div>
+                                            <div class="text-xs text-slate-400 md:hidden">Empresa ABC</div>
+                                        </td>
+                                        <td class="px-4 py-3.5 text-slate-600 hidden md:table-cell">Empresa ABC SpA</td>
+                                        <td class="px-4 py-3.5 hidden lg:table-cell">
+                                            <span class="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-medium">LAN</span>
+                                        </td>
+                                        <td class="px-4 py-3.5"><span class="badge badge-active">✅ Activo</span></td>
+                                        <td class="px-4 py-3.5"><span class="badge badge-warranty">🛡️ Vigente</span></td>
+                                        <td class="px-4 py-3.5 text-center">
+                                            <div class="flex items-center justify-center gap-1">
+                                                <button onclick="verImpresora(6)" class="p-1.5 rounded-lg hover:bg-primary-50 text-primary-600 transition" title="Ver detalle">
+                                                    <i data-lucide="eye" class="w-4 h-4"></i>
+                                                </button>
+                                                <button onclick="editarImpresora(6)" class="p-1.5 rounded-lg hover:bg-primary-50 text-primary-600 transition" title="Editar">
+                                                    <i data-lucide="pencil" class="w-4 h-4"></i>
+                                                </button>
+                                                <button onclick="eliminarImpresora(6, 'Xerox WorkCentre 6515')" class="p-1.5 rounded-lg hover:bg-danger-50 text-danger-500 transition" title="Eliminar">
+                                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <!-- Equipo 7 -->
+                                    <tr class="border-b border-slate-50 hover:bg-slate-50/50 transition impresora-row" data-page="2">
+                                        <td class="px-4 py-3.5 font-mono text-xs text-slate-500">CN-7760-K</td>
+                                        <td class="px-4 py-3.5">
+                                            <div class="font-medium text-slate-700">Canon imageRUNNER 2206</div>
+                                            <div class="text-xs text-slate-400 md:hidden">SpA Logística</div>
+                                        </td>
+                                        <td class="px-4 py-3.5 text-slate-600 hidden md:table-cell">SpA Logística Norte</td>
+                                        <td class="px-4 py-3.5 hidden lg:table-cell">
+                                            <span class="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-medium">Wi-Fi</span>
+                                        </td>
+                                        <td class="px-4 py-3.5"><span class="badge badge-active">✅ Activo</span></td>
+                                        <td class="px-4 py-3.5"><span class="badge badge-expired">⚠️ Vencida</span></td>
+                                        <td class="px-4 py-3.5 text-center">
+                                            <div class="flex items-center justify-center gap-1">
+                                                <button onclick="verImpresora(7)" class="p-1.5 rounded-lg hover:bg-primary-50 text-primary-600 transition" title="Ver detalle">
+                                                    <i data-lucide="eye" class="w-4 h-4"></i>
+                                                </button>
+                                                <button onclick="editarImpresora(7)" class="p-1.5 rounded-lg hover:bg-primary-50 text-primary-600 transition" title="Editar">
+                                                    <i data-lucide="pencil" class="w-4 h-4"></i>
+                                                </button>
+                                                <button onclick="eliminarImpresora(7, 'Canon imageRUNNER 2206')" class="p-1.5 rounded-lg hover:bg-danger-50 text-danger-500 transition" title="Eliminar">
+                                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <!-- Equipo 8 -->
+                                    <tr class="hover:bg-slate-50/50 transition impresora-row" data-page="2">
+                                        <td class="px-4 py-3.5 font-mono text-xs text-slate-500">HP-5025-M</td>
+                                        <td class="px-4 py-3.5">
+                                            <div class="font-medium text-slate-700">HP Color LaserJet Enterprise MFP M480f</div>
+                                            <div class="text-xs text-slate-400 md:hidden">Clínica Salud</div>
+                                        </td>
+                                        <td class="px-4 py-3.5 text-slate-600 hidden md:table-cell">Clínica Salud Total</td>
+                                        <td class="px-4 py-3.5 hidden lg:table-cell">
+                                            <span class="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-medium">LAN</span>
+                                        </td>
+                                        <td class="px-4 py-3.5"><span class="badge badge-repair">🔧 En Reparación</span></td>
+                                        <td class="px-4 py-3.5"><span class="badge badge-warranty">🛡️ Vigente</span></td>
+                                        <td class="px-4 py-3.5 text-center">
+                                            <div class="flex items-center justify-center gap-1">
+                                                <button onclick="verImpresora(8)" class="p-1.5 rounded-lg hover:bg-primary-50 text-primary-600 transition" title="Ver detalle">
+                                                    <i data-lucide="eye" class="w-4 h-4"></i>
+                                                </button>
+                                                <button onclick="editarImpresora(8)" class="p-1.5 rounded-lg hover:bg-primary-50 text-primary-600 transition" title="Editar">
+                                                    <i data-lucide="pencil" class="w-4 h-4"></i>
+                                                </button>
+                                                <button onclick="eliminarImpresora(8, 'HP Color LaserJet Enterprise MFP M480f')" class="p-1.5 rounded-lg hover:bg-danger-50 text-danger-500 transition" title="Eliminar">
+                                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <!-- Paginación -->
+                        <div id="impresorasPagination" class="px-6 py-3 border-t border-slate-100 flex items-center justify-between text-sm">
+                            <span id="impresorasInfo" class="text-slate-400">Mostrando 1-5 de 8 equipos</span>
+                            <div id="impresorasPagButtons" class="flex items-center gap-1">
+                                <button onclick="cambiarPagImpresoras('prev')" id="pagPrevBtn" class="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-400 cursor-not-allowed">Ant.</button>
+                                <button onclick="cambiarPagImpresoras(1)" id="pagBtn1" class="px-3 py-1.5 rounded-lg bg-primary-600 text-white font-semibold">1</button>
+                                <button onclick="cambiarPagImpresoras(2)" id="pagBtn2" class="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition">2</button>
+                                <button onclick="cambiarPagImpresoras('next')" id="pagNextBtn" class="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition">Sig.</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ====== NIVELES DE SUMINISTROS DEL PARQUE ====== -->
+                    <div class="mt-6">
+
+                    <!-- Resumen General de Suministros -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                        <!-- Tóner General -->
+                        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 rounded-xl bg-primary-50 border border-primary-100
+                                            flex items-center justify-center">
+                                    <i data-lucide="droplets" class="w-5 h-5 text-primary-600"></i>
+                                </div>
+                                <div>
+                                    <p class="text-xs text-slate-400 font-medium">Tóner General</p>
+                                    <p class="text-lg font-bold text-slate-800">62%</p>
+                                </div>
+                            </div>
+                            <div class="w-full bg-slate-100 rounded-full h-2.5">
+                                <div class="bg-primary-500 h-2.5 rounded-full transition-all duration-500" style="width: 62%"></div>
+                            </div>
+                            <p class="text-[11px] text-slate-400 mt-2">Promedio de 8 equipos</p>
+                        </div>
+
+                        <!-- Tambores -->
+                        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 rounded-xl bg-success-50 border border-success-100
+                                            flex items-center justify-center">
+                                    <i data-lucide="circle-dot" class="w-5 h-5 text-success-600"></i>
+                                </div>
+                                <div>
+                                    <p class="text-xs text-slate-400 font-medium">Tambores</p>
+                                    <p class="text-lg font-bold text-slate-800">78%</p>
+                                </div>
+                            </div>
+                            <div class="w-full bg-slate-100 rounded-full h-2.5">
+                                <div class="bg-success-500 h-2.5 rounded-full transition-all duration-500" style="width: 78%"></div>
+                            </div>
+                            <p class="text-[11px] text-slate-400 mt-2">2 unidades próximas a vencer</p>
+                        </div>
+
+                        <!-- Fusores -->
+                        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 rounded-xl bg-warning-50 border border-warning-100
+                                            flex items-center justify-center">
+                                    <i data-lucide="flame" class="w-5 h-5 text-warning-600"></i>
+                                </div>
+                                <div>
+                                    <p class="text-xs text-slate-400 font-medium">Fusores</p>
+                                    <p class="text-lg font-bold text-slate-800">45%</p>
+                                </div>
+                            </div>
+                            <div class="w-full bg-slate-100 rounded-full h-2.5">
+                                <div class="bg-warning-500 h-2.5 rounded-full transition-all duration-500" style="width: 45%"></div>
+                            </div>
+                            <p class="text-[11px] text-warning-500 font-semibold mt-2">⚠ 3 unidades bajas</p>
+                        </div>
+
+                        <!-- Kit de Mantención -->
+                        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 rounded-xl bg-danger-50 border border-danger-100
+                                            flex items-center justify-center">
+                                    <i data-lucide="package" class="w-5 h-5 text-danger-600"></i>
+                                </div>
+                                <div>
+                                    <p class="text-xs text-slate-400 font-medium">Kits de Mantención</p>
+                                    <p class="text-lg font-bold text-danger-600">28%</p>
+                                </div>
+                            </div>
+                            <div class="w-full bg-slate-100 rounded-full h-2.5">
+                                <div class="bg-danger-500 h-2.5 rounded-full transition-all duration-500" style="width: 28%"></div>
+                            </div>
+                            <p class="text-[11px] text-danger-500 font-semibold mt-2">🔴 Stock crítico — Reordenar</p>
+                        </div>
+                    </div>
+
+                    <!-- Tabla Detallada de Suministros por Equipo -->
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
+                        <div class="px-6 py-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                                <h3 class="text-base font-semibold text-slate-800 flex items-center gap-2">
+                                    <i data-lucide="gauge" class="w-5 h-5 text-primary-500"></i>
+                                    Niveles de Suministros por Equipo
+                                </h3>
+                                <p class="text-xs text-slate-400 mt-0.5">Estado actual de consumibles y piezas de cada impresora</p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <select class="border border-slate-200 rounded-lg px-3 py-2 text-sm
+                                               focus:ring-2 focus:ring-primary-500 outline-none cursor-pointer">
+                                    <option value="all">Todos los equipos</option>
+                                    <option value="low">⚠ Nivel bajo</option>
+                                    <option value="critical">🔴 Nivel crítico</option>
+                                    <option value="ok">✅ Nivel OK</option>
+                                </select>
+                                <button class="p-2 rounded-lg hover:bg-slate-100 transition" title="Exportar suministros">
+                                    <i data-lucide="download" class="w-4 h-4 text-slate-500"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="w-full text-sm">
+                                <thead>
+                                    <tr class="border-b border-slate-100 bg-slate-50">
+                                        <th class="text-left px-4 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wider">Equipo</th>
+                                        <th class="text-left px-4 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wider hidden md:table-cell">Serie</th>
+                                        <th class="text-left px-4 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wider">Tóner</th>
+                                        <th class="text-left px-4 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wider hidden lg:table-cell">Drum</th>
+                                        <th class="text-left px-4 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wider hidden lg:table-cell">Fusor</th>
+                                        <th class="text-left px-4 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wider hidden xl:table-cell">Kit Mant.</th>
+                                        <th class="text-left px-4 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wider hidden lg:table-cell">Último Registro</th>
+                                        <th class="text-center px-4 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wider">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Equipo 1: HP LaserJet Pro M404dn -->
+                                    <tr class="border-b border-slate-50 hover:bg-slate-50/50 transition">
+                                        <td class="px-4 py-3.5">
+                                            <div class="font-medium text-slate-700">HP LaserJet Pro M404dn</div>
+                                            <div class="text-xs text-slate-400 md:hidden">VNB4-231001A</div>
+                                        </td>
+                                        <td class="px-4 py-3.5 font-mono text-xs text-slate-500 hidden md:table-cell">VNB4-231001A</td>
+                                        <!-- Tóner: 72% -->
+                                        <td class="px-4 py-3.5">
+                                            <div class="flex items-center gap-2">
+                                                <div class="flex-1 max-w-[100px] bg-slate-100 rounded-full h-2">
+                                                    <div class="bg-primary-500 h-2 rounded-full" style="width: 72%"></div>
+                                                </div>
+                                                <span class="text-xs font-semibold text-slate-600">72%</span>
+                                            </div>
+                                        </td>
+                                        <!-- Drum: 55% -->
+                                        <td class="px-4 py-3.5 hidden lg:table-cell">
+                                            <div class="flex items-center gap-2">
+                                                <div class="flex-1 max-w-[100px] bg-slate-100 rounded-full h-2">
+                                                    <div class="bg-primary-400 h-2 rounded-full" style="width: 55%"></div>
+                                                </div>
+                                                <span class="text-xs font-semibold text-slate-600">55%</span>
+                                            </div>
+                                        </td>
+                                        <!-- Fusor: 40% -->
+                                        <td class="px-4 py-3.5 hidden lg:table-cell">
+                                            <div class="flex items-center gap-2">
+                                                <div class="flex-1 max-w-[100px] bg-slate-100 rounded-full h-2">
+                                                    <div class="bg-warning-500 h-2 rounded-full" style="width: 40%"></div>
+                                                </div>
+                                                <span class="text-xs font-semibold text-warning-600">40%</span>
+                                            </div>
+                                        </td>
+                                        <!-- Kit Mantención: 65% -->
+                                        <td class="px-4 py-3.5 hidden xl:table-cell">
+                                            <div class="flex items-center gap-2">
+                                                <div class="flex-1 max-w-[100px] bg-slate-100 rounded-full h-2">
+                                                    <div class="bg-success-500 h-2 rounded-full" style="width: 65%"></div>
+                                                </div>
+                                                <span class="text-xs font-semibold text-slate-600">65%</span>
+                                            </div>
+                                        </td>
+                                        <!-- Último Registro -->
+                                        <td class="px-4 py-3.5 hidden lg:table-cell">
+                                            <div class="text-sm text-slate-700 font-medium">18/07/2026</div>
+                                            <div class="text-[11px] text-slate-400">Hace 1 día</div>
+                                        </td>
+                                        <td class="px-4 py-3.5 text-center">
+                                            <button class="p-1.5 rounded-lg hover:bg-primary-50 text-primary-600 transition" title="Actualizar nivel">
+                                                <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+
+                                    <!-- Equipo 2: Epson EcoTank L4750 -->
+                                    <tr class="border-b border-slate-50 hover:bg-slate-50/50 transition">
+                                        <td class="px-4 py-3.5">
+                                            <div class="font-medium text-slate-700">Epson EcoTank L4750</div>
+                                            <div class="text-xs text-slate-400 md:hidden">EP-4750-A</div>
+                                        </td>
+                                        <td class="px-4 py-3.5 font-mono text-xs text-slate-500 hidden md:table-cell">EP-4750-A</td>
+                                        <!-- Tóner (Tinta): 15% CRÍTICO -->
+                                        <td class="px-4 py-3.5">
+                                            <div class="flex items-center gap-2">
+                                                <div class="flex-1 max-w-[100px] bg-slate-100 rounded-full h-2">
+                                                    <div class="bg-danger-500 h-2 rounded-full" style="width: 15%"></div>
+                                                </div>
+                                                <span class="text-xs font-bold text-danger-600">15%</span>
+                                            </div>
+                                        </td>
+                                        <!-- Drum: 80% -->
+                                        <td class="px-4 py-3.5 hidden lg:table-cell">
+                                            <div class="flex items-center gap-2">
+                                                <div class="flex-1 max-w-[100px] bg-slate-100 rounded-full h-2">
+                                                    <div class="bg-success-500 h-2 rounded-full" style="width: 80%"></div>
+                                                </div>
+                                                <span class="text-xs font-semibold text-slate-600">80%</span>
+                                            </div>
+                                        </td>
+                                        <!-- Fusor: 62% -->
+                                        <td class="px-4 py-3.5 hidden lg:table-cell">
+                                            <div class="flex items-center gap-2">
+                                                <div class="flex-1 max-w-[100px] bg-slate-100 rounded-full h-2">
+                                                    <div class="bg-primary-400 h-2 rounded-full" style="width: 62%"></div>
+                                                </div>
+                                                <span class="text-xs font-semibold text-slate-600">62%</span>
+                                            </div>
+                                        </td>
+                                        <!-- Kit Mantención: 70% -->
+                                        <td class="px-4 py-3.5 hidden xl:table-cell">
+                                            <div class="flex items-center gap-2">
+                                                <div class="flex-1 max-w-[100px] bg-slate-100 rounded-full h-2">
+                                                    <div class="bg-success-500 h-2 rounded-full" style="width: 70%"></div>
+                                                </div>
+                                                <span class="text-xs font-semibold text-slate-600">70%</span>
+                                            </div>
+                                        </td>
+                                        <!-- Último Registro -->
+                                        <td class="px-4 py-3.5 hidden lg:table-cell">
+                                            <div class="text-sm text-slate-700 font-medium">15/07/2026</div>
+                                            <div class="text-[11px] text-warning-500 font-semibold">Hace 4 días</div>
+                                        </td>
+                                        <td class="px-4 py-3.5 text-center">
+                                            <button class="p-1.5 rounded-lg hover:bg-primary-50 text-primary-600 transition" title="Actualizar nivel">
+                                                <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+
+                                    <!-- Equipo 3: Brother MFC-L4280DW -->
+                                    <tr class="border-b border-slate-50 hover:bg-slate-50/50 transition">
+                                        <td class="px-4 py-3.5">
+                                            <div class="font-medium text-slate-700">Brother MFC-L4280DW</div>
+                                            <div class="text-xs text-slate-400 md:hidden">BR-M428-DW</div>
+                                        </td>
+                                        <td class="px-4 py-3.5 font-mono text-xs text-slate-500 hidden md:table-cell">BR-M428-DW</td>
+                                        <!-- Tóner: 88% -->
+                                        <td class="px-4 py-3.5">
+                                            <div class="flex items-center gap-2">
+                                                <div class="flex-1 max-w-[100px] bg-slate-100 rounded-full h-2">
+                                                    <div class="bg-success-500 h-2 rounded-full" style="width: 88%"></div>
+                                                </div>
+                                                <span class="text-xs font-semibold text-slate-600">88%</span>
+                                            </div>
+                                        </td>
+                                        <!-- Drum: 70% -->
+                                        <td class="px-4 py-3.5 hidden lg:table-cell">
+                                            <div class="flex items-center gap-2">
+                                                <div class="flex-1 max-w-[100px] bg-slate-100 rounded-full h-2">
+                                                    <div class="bg-primary-400 h-2 rounded-full" style="width: 70%"></div>
+                                                </div>
+                                                <span class="text-xs font-semibold text-slate-600">70%</span>
+                                            </div>
+                                        </td>
+                                        <!-- Fusor: 50% -->
+                                        <td class="px-4 py-3.5 hidden lg:table-cell">
+                                            <div class="flex items-center gap-2">
+                                                <div class="flex-1 max-w-[100px] bg-slate-100 rounded-full h-2">
+                                                    <div class="bg-primary-400 h-2 rounded-full" style="width: 50%"></div>
+                                                </div>
+                                                <span class="text-xs font-semibold text-slate-600">50%</span>
+                                            </div>
+                                        </td>
+                                        <!-- Kit Mantención: 35% BAJO -->
+                                        <td class="px-4 py-3.5 hidden xl:table-cell">
+                                            <div class="flex items-center gap-2">
+                                                <div class="flex-1 max-w-[100px] bg-slate-100 rounded-full h-2">
+                                                    <div class="bg-warning-500 h-2 rounded-full" style="width: 35%"></div>
+                                                </div>
+                                                <span class="text-xs font-semibold text-warning-600">35%</span>
+                                            </div>
+                                        </td>
+                                        <!-- Último Registro -->
+                                        <td class="px-4 py-3.5 hidden lg:table-cell">
+                                            <div class="text-sm text-danger-600 font-bold">01/07/2026</div>
+                                            <div class="text-[11px] text-danger-500 font-semibold">Hace 18 días ⚠</div>
+                                        </td>
+                                        <td class="px-4 py-3.5 text-center">
+                                            <button class="p-1.5 rounded-lg hover:bg-primary-50 text-primary-600 transition" title="Actualizar nivel">
+                                                <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+
+                                    <!-- Equipo 4: Samsung SL-M5732FN -->
+                                    <tr class="border-b border-slate-50 hover:bg-slate-50/50 transition">
+                                        <td class="px-4 py-3.5">
+                                            <div class="font-medium text-slate-700">Samsung SL-M5732FN</div>
+                                            <div class="text-xs text-slate-400 md:hidden">SN-5732-N</div>
+                                        </td>
+                                        <td class="px-4 py-3.5 font-mono text-xs text-slate-500 hidden md:table-cell">SN-5732-N</td>
+                                        <!-- Tóner: 58% -->
+                                        <td class="px-4 py-3.5">
+                                            <div class="flex items-center gap-2">
+                                                <div class="flex-1 max-w-[100px] bg-slate-100 rounded-full h-2">
+                                                    <div class="bg-primary-400 h-2 rounded-full" style="width: 58%"></div>
+                                                </div>
+                                                <span class="text-xs font-semibold text-slate-600">58%</span>
+                                            </div>
+                                        </td>
+                                        <!-- Drum: 42% -->
+                                        <td class="px-4 py-3.5 hidden lg:table-cell">
+                                            <div class="flex items-center gap-2">
+                                                <div class="flex-1 max-w-[100px] bg-slate-100 rounded-full h-2">
+                                                    <div class="bg-warning-500 h-2 rounded-full" style="width: 42%"></div>
+                                                </div>
+                                                <span class="text-xs font-semibold text-warning-600">42%</span>
+                                            </div>
+                                        </td>
+                                        <!-- Fusor: 25% BAJO -->
+                                        <td class="px-4 py-3.5 hidden lg:table-cell">
+                                            <div class="flex items-center gap-2">
+                                                <div class="flex-1 max-w-[100px] bg-slate-100 rounded-full h-2">
+                                                    <div class="bg-danger-500 h-2 rounded-full" style="width: 25%"></div>
+                                                </div>
+                                                <span class="text-xs font-bold text-danger-600">25%</span>
+                                            </div>
+                                        </td>
+                                        <!-- Kit Mantención: 55% -->
+                                        <td class="px-4 py-3.5 hidden xl:table-cell">
+                                            <div class="flex items-center gap-2">
+                                                <div class="flex-1 max-w-[100px] bg-slate-100 rounded-full h-2">
+                                                    <div class="bg-primary-400 h-2 rounded-full" style="width: 55%"></div>
+                                                </div>
+                                                <span class="text-xs font-semibold text-slate-600">55%</span>
+                                            </div>
+                                        </td>
+                                        <!-- Último Registro -->
+                                        <td class="px-4 py-3.5 hidden lg:table-cell">
+                                            <div class="text-sm text-slate-700 font-medium">17/07/2026</div>
+                                            <div class="text-[11px] text-slate-400">Hace 2 días</div>
+                                        </td>
+                                        <td class="px-4 py-3.5 text-center">
+                                            <button class="p-1.5 rounded-lg hover:bg-primary-50 text-primary-600 transition" title="Actualizar nivel">
+                                                <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+
+                                    <!-- Equipo 5: Kyocera ECOSYS M4035idn (De Baja) -->
+                                    <tr class="hover:bg-slate-50/50 transition opacity-60">
+                                        <td class="px-4 py-3.5">
+                                            <div class="font-medium text-slate-700">Kyocera ECOSYS M4035idn</div>
+                                            <div class="text-xs text-slate-400 md:hidden">KY-M4035</div>
+                                        </td>
+                                        <td class="px-4 py-3.5 font-mono text-xs text-slate-500 hidden md:table-cell">KY-M4035</td>
+                                        <!-- Tóner: 0% BAJA -->
+                                        <td class="px-4 py-3.5">
+                                            <div class="flex items-center gap-2">
+                                                <div class="flex-1 max-w-[100px] bg-slate-100 rounded-full h-2">
+                                                    <div class="bg-slate-300 h-2 rounded-full" style="width: 0%"></div>
+                                                </div>
+                                                <span class="text-xs font-semibold text-slate-400">N/A</span>
+                                            </div>
+                                        </td>
+                                        <!-- Drum: N/A -->
+                                        <td class="px-4 py-3.5 hidden lg:table-cell">
+                                            <span class="text-xs text-slate-400">N/A</span>
+                                        </td>
+                                        <!-- Fusor: N/A -->
+                                        <td class="px-4 py-3.5 hidden lg:table-cell">
+                                            <span class="text-xs text-slate-400">N/A</span>
+                                        </td>
+                                        <!-- Kit Mantención: N/A -->
+                                        <td class="px-4 py-3.5 hidden xl:table-cell">
+                                            <span class="text-xs text-slate-400">N/A</span>
+                                        </td>
+                                        <!-- Último Registro: N/A -->
+                                        <td class="px-4 py-3.5 hidden lg:table-cell">
+                                            <span class="text-xs text-slate-400">—</span>
+                                        </td>
+                                        <td class="px-4 py-3.5 text-center">
+                                            <span class="badge badge-down text-[10px]">De Baja</span>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Alertas de Suministros Bajos -->
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm mt-6">
+                        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                            <h3 class="text-base font-semibold text-slate-800 flex items-center gap-2">
+                                <i data-lucide="alert-triangle" class="w-5 h-5 text-danger-500"></i>
+                                Alertas de Suministros Bajos
+                            </h3>
+                            <span class="badge badge-down">4 alertas activas</span>
+                        </div>
+                        <div class="divide-y divide-slate-100">
+                            <!-- Alerta 1 -->
+                            <div class="px-6 py-4 flex items-center gap-4 hover:bg-slate-50/50 transition">
+                                <div class="w-10 h-10 rounded-xl bg-danger-50 border border-danger-100
+                                            flex items-center justify-center shrink-0">
+                                    <i data-lucide="droplets" class="w-5 h-5 text-danger-600"></i>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-sm font-semibold text-slate-800">Tóner Epson EcoTank L4750</p>
+                                    <p class="text-xs text-slate-400">Serie: EP-4750-A — Nivel actual: <span class="text-danger-600 font-bold">15%</span> — Cliente: Constructora XYZ</p>
+                                </div>
+                                <span class="text-xs font-bold text-danger-600 bg-danger-50 px-2.5 py-1 rounded-full shrink-0">Crítico</span>
+                                <button class="shrink-0 bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition">
+                                    Ordenar
+                                </button>
+                            </div>
+                            <!-- Alerta 2 -->
+                            <div class="px-6 py-4 flex items-center gap-4 hover:bg-slate-50/50 transition">
+                                <div class="w-10 h-10 rounded-xl bg-danger-50 border border-danger-100
+                                            flex items-center justify-center shrink-0">
+                                    <i data-lucide="flame" class="w-5 h-5 text-danger-600"></i>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-sm font-semibold text-slate-800">Fusor Samsung SL-M5732FN</p>
+                                    <p class="text-xs text-slate-400">Serie: SN-5732-N — Nivel actual: <span class="text-danger-600 font-bold">25%</span> — Cliente: SpA Logística Norte</p>
+                                </div>
+                                <span class="text-xs font-bold text-danger-600 bg-danger-50 px-2.5 py-1 rounded-full shrink-0">Crítico</span>
+                                <button class="shrink-0 bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition">
+                                    Ordenar
+                                </button>
+                            </div>
+                            <!-- Alerta 3 -->
+                            <div class="px-6 py-4 flex items-center gap-4 hover:bg-slate-50/50 transition">
+                                <div class="w-10 h-10 rounded-xl bg-warning-50 border border-warning-100
+                                            flex items-center justify-center shrink-0">
+                                    <i data-lucide="package" class="w-5 h-5 text-warning-600"></i>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-sm font-semibold text-slate-800">Kit de Mantención Brother MFC-L4280DW</p>
+                                    <p class="text-xs text-slate-400">Serie: BR-M428-DW — Nivel actual: <span class="text-warning-600 font-bold">35%</span> — Cliente: Empresa ABC</p>
+                                </div>
+                                <span class="text-xs font-bold text-warning-600 bg-warning-50 px-2.5 py-1 rounded-full shrink-0">Bajo</span>
+                                <button class="shrink-0 bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition">
+                                    Ordenar
+                                </button>
+                            </div>
+                            <!-- Alerta 4 -->
+                            <div class="px-6 py-4 flex items-center gap-4 hover:bg-slate-50/50 transition">
+                                <div class="w-10 h-10 rounded-xl bg-warning-50 border border-warning-100
+                                            flex items-center justify-center shrink-0">
+                                    <i data-lucide="flame" class="w-5 h-5 text-warning-600"></i>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-sm font-semibold text-slate-800">Fusor HP LaserJet Pro M404dn</p>
+                                    <p class="text-xs text-slate-400">Serie: VNB4-231001A — Nivel actual: <span class="text-warning-600 font-bold">40%</span> — Cliente: Empresa ABC</p>
+                                </div>
+                                <span class="text-xs font-bold text-warning-600 bg-warning-50 px-2.5 py-1 rounded-full shrink-0">Bajo</span>
+                                <button class="shrink-0 bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition">
+                                    Ordenar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+
+                <!-- ====================================================
+                     MÓDULO 4: REGISTRO OPERATIVO (Técnicos)
+                     ==================================================== -->
+                <section id="section-operativo" class="page-section">
+
+                    <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+
+                        <!-- ====== FORMULARIO DE CONTADORES ====== -->
+                        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
+                            <div class="px-6 py-4 border-b border-slate-100">
+                                <h3 class="text-base font-semibold text-slate-800 flex items-center gap-2">
+                                    <i data-lucide="hash" class="w-5 h-5 text-primary-500"></i>
+                                    Registro de Contadores
+                                </h3>
+                                <p class="text-xs text-slate-400 mt-1">
+                                    Ingrese los contadores mensuales de cada impresora
+                                </p>
+                            </div>
+                            <form class="p-6" onsubmit="return false;">
+                                <div class="space-y-5">
+                                    <!-- Impresora (Serie) -->
+                                    <div>
+                                        <label class="block text-sm font-medium text-slate-600 mb-1.5">
+                                            Impresora (Serie) <span class="text-danger-500">*</span>
+                                        </label>
+                                        <select id="counterPrinter"
+                                                class="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm
+                                                       text-slate-700 focus:ring-2 focus:ring-primary-500
+                                                       focus:border-primary-500 outline-none transition cursor-pointer"
+                                                onchange="calculateDifference()">
+                                            <option value="">Seleccionar impresora...</option>
+                                            <option value="hp-m404">HP LaserJet Pro M404dn — VNB4-231001A</option>
+                                            <option value="epson-l4750">Epson EcoTank L4750 — EP-4750-A</option>
+                                            <option value="brother-m428">Brother MFC-L4280DW — BR-M428-DW</option>
+                                            <option value="samsung-m5732">Samsung SL-M5732FN — SN-5732-N</option>
+                                            <option value="kyocera-m4035">Kyocera ECOSYS M4035idn — KY-M4035</option>
+                                        </select>
+                                    </div>
+
+                                    <!-- Contador Inicial -->
+                                    <div>
+                                        <label class="block text-sm font-medium text-slate-600 mb-1.5">
+                                            Contador Inicial (mes anterior) <span class="text-danger-500">*</span>
+                                        </label>
+                                        <input type="number" id="counterInitial" placeholder="0"
+                                               min="0"
+                                               class="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm
+                                                      placeholder:text-slate-300 focus:ring-2 focus:ring-primary-500
+                                                      focus:border-primary-500 outline-none transition font-mono"
+                                               oninput="calculateDifference()">
+                                    </div>
+
+                                    <!-- Contador Mensual Actual -->
+                                    <div>
+                                        <label class="block text-sm font-medium text-slate-600 mb-1.5">
+                                            Contador Mensual Actual <span class="text-danger-500">*</span>
+                                        </label>
+                                        <input type="number" id="counterCurrent" placeholder="0"
+                                               min="0"
+                                               class="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm
+                                                      placeholder:text-slate-300 focus:ring-2 focus:ring-primary-500
+                                                      focus:border-primary-500 outline-none transition font-mono"
+                                               oninput="calculateDifference()">
+                                    </div>
+
+                                    <!-- Diferencia del Mes (solo lectura) -->
+                                    <div>
+                                        <label class="block text-sm font-medium text-slate-600 mb-1.5">
+                                            Diferencia del Mes
+                                        </label>
+                                        <div id="counterDifference"
+                                             class="w-full bg-slate-50 border-2 border-dashed border-slate-200
+                                                    rounded-lg px-3.5 py-2.5 text-sm font-bold text-slate-400
+                                                    text-center font-mono transition-all duration-300">
+                                            —
+                                        </div>
+                                    </div>
+
+                                    <!-- Fecha del registro -->
+                                    <div>
+                                        <label class="block text-sm font-medium text-slate-600 mb-1.5">
+                                            Fecha de Registro
+                                        </label>
+                                        <input type="date" value="2026-07-19"
+                                               class="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm
+                                                      text-slate-700 focus:ring-2 focus:ring-primary-500
+                                                      focus:border-primary-500 outline-none transition">
+                                    </div>
+                                </div>
+
+                                <!-- Botones -->
+                                <div class="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-slate-100">
+                                    <button type="button"
+                                            class="px-4 py-2.5 text-sm font-medium text-slate-600 bg-slate-100
+                                                   hover:bg-slate-200 rounded-lg transition">
+                                        Limpiar
+                                    </button>
+                                    <button type="button" onclick="registrarContador()"
+                                            class="px-5 py-2.5 text-sm font-semibold text-white bg-primary-600
+                                                   hover:bg-primary-700 rounded-lg shadow-sm transition
+                                                   flex items-center gap-2">
+                                        <i data-lucide="save" class="w-4 h-4"></i>
+                                        Registrar Contador
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <!-- ====== FORMULARIO DE VISITA TÉCNICA ====== -->
+                        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
+                            <div class="px-6 py-4 border-b border-slate-100">
+                                <h3 class="text-base font-semibold text-slate-800 flex items-center gap-2">
+                                    <i data-lucide="wrench" class="w-5 h-5 text-warning-500"></i>
+                                    Registro de Visita Técnica
+                                </h3>
+                                <p class="text-xs text-slate-400 mt-1">
+                                    Documente cada intervención técnica realizada
+                                </p>
+                            </div>
+                            <form class="p-6" onsubmit="return false;">
+                                <div class="space-y-5">
+                                    <!-- Fecha de la Visita -->
+                                    <div>
+                                        <label class="block text-sm font-medium text-slate-600 mb-1.5">
+                                            Fecha de Visita <span class="text-danger-500">*</span>
+                                        </label>
+                                        <input type="date" value="2026-07-19"
+                                               class="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm
+                                                      text-slate-700 focus:ring-2 focus:ring-primary-500
+                                                      focus:border-primary-500 outline-none transition">
+                                    </div>
+
+                                    <!-- Impresora visitada -->
+                                    <div>
+                                        <label class="block text-sm font-medium text-slate-600 mb-1.5">
+                                            Impresora <span class="text-danger-500">*</span>
+                                        </label>
+                                        <select class="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm
+                                                       text-slate-700 focus:ring-2 focus:ring-primary-500
+                                                       focus:border-primary-500 outline-none transition cursor-pointer">
+                                            <option value="">Seleccionar impresora...</option>
+                                            <option value="hp-m404">HP LaserJet Pro M404dn — VNB4-231001A</option>
+                                            <option value="epson-l4750">Epson EcoTank L4750 — EP-4750-A</option>
+                                            <option value="brother-m428">Brother MFC-L4280DW — BR-M428-DW</option>
+                                            <option value="samsung-m5732">Samsung SL-M5732FN — SN-5732-N</option>
+                                            <option value="kyocera-m4035">Kyocera ECOSYS M4035idn — KY-M4035</option>
+                                        </select>
+                                    </div>
+
+                                    <!-- Motivo de la Visita -->
+                                    <div>
+                                        <label class="block text-sm font-medium text-slate-600 mb-1.5">
+                                            Motivo <span class="text-danger-500">*</span>
+                                        </label>
+                                        <div class="flex gap-3">
+                                            <label class="flex-1 flex items-center gap-3 p-3 border-2 border-primary-200
+                                                          bg-primary-50 rounded-lg cursor-pointer transition hover:border-primary-400">
+                                                <input type="radio" name="motivo" value="preventiva" checked
+                                                       class="w-4 h-4 text-primary-600 focus:ring-primary-500">
+                                                <div>
+                                                    <span class="text-sm font-semibold text-primary-700">🛡️ Preventiva</span>
+                                                    <p class="text-[11px] text-primary-500">Mantenimiento programado</p>
+                                                </div>
+                                            </label>
+                                            <label class="flex-1 flex items-center gap-3 p-3 border-2 border-slate-200
+                                                          rounded-lg cursor-pointer transition hover:border-slate-400">
+                                                <input type="radio" name="motivo" value="correctiva"
+                                                       class="w-4 h-4 text-primary-600 focus:ring-primary-500"
+                                                       onchange="this.closest('.flex').querySelectorAll('label').forEach(l => {l.classList.remove('border-primary-200','bg-primary-50'); l.classList.add('border-slate-200');}); this.parentElement.classList.remove('border-slate-200'); this.parentElement.classList.add('border-primary-200','bg-primary-50');">
+                                                <div>
+                                                    <span class="text-sm font-semibold text-slate-700">🔧 Correctiva</span>
+                                                    <p class="text-[11px] text-slate-400">Reparación / Falla</p>
+                                                </div>
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <!-- Reporte Técnico -->
+                                    <div>
+                                        <label class="block text-sm font-medium text-slate-600 mb-1.5">
+                                            Reporte Técnico <span class="text-danger-500">*</span>
+                                        </label>
+                                        <textarea rows="4" placeholder="Describe detalladamente la intervención realizada, piezas reemplazadas, observaciones..."
+                                                  class="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm
+                                                         placeholder:text-slate-300 focus:ring-2 focus:ring-primary-500
+                                                         focus:border-primary-500 outline-none transition resize-none"></textarea>
+                                    </div>
+
+                                    <!-- Costo de Visita + Garantía -->
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <!-- Costo -->
+                                        <div>
+                                            <label class="block text-sm font-medium text-slate-600 mb-1.5">
+                                                Costo de Visita ($)
+                                            </label>
+                                            <div class="relative">
+                                                <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-slate-400 font-medium">$</span>
+                                                <input type="number" id="visitCost" placeholder="0" min="0"
+                                                       class="w-full border border-slate-300 rounded-lg pl-8 pr-3.5 py-2.5 text-sm
+                                                              placeholder:text-slate-300 focus:ring-2 focus:ring-primary-500
+                                                              focus:border-primary-500 outline-none transition font-mono text-right">
+                                            </div>
+                                        </div>
+
+                                        <!-- Aplica Garantía (Toggle) -->
+                                        <div>
+                                            <label class="block text-sm font-medium text-slate-600 mb-1.5">
+                                                ¿Aplica Garantía?
+                                            </label>
+                                            <div class="flex items-center gap-3 mt-2">
+                                                <label class="toggle-switch">
+                                                    <input type="checkbox" id="warrantyToggle">
+                                                    <span class="toggle-slider"></span>
+                                                </label>
+                                                <span id="warrantyLabel" class="text-sm text-slate-500 font-medium">
+                                                    No aplica
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Resumen visual del costo -->
+                                    <div class="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-sm text-slate-500">Costo estimado:</span>
+                                            <span id="costSummary" class="text-lg font-bold text-slate-800">$0</span>
+                                        </div>
+                                        <div id="warrantyNote" class="text-xs text-slate-400 mt-1 hidden">
+                                            ⚠️ Esta visita está cubierta por garantía — Sin costo para el cliente
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Botones -->
+                                <div class="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-slate-100">
+                                    <button type="button"
+                                            class="px-4 py-2.5 text-sm font-medium text-slate-600 bg-slate-100
+                                                   hover:bg-slate-200 rounded-lg transition">
+                                        Cancelar
+                                    </button>
+                                <button type="button" onclick="registrarVisita()"
+                                        class="px-5 py-2.5 text-sm font-semibold text-white bg-primary-600
+                                               hover:bg-primary-700 rounded-lg shadow-sm transition
+                                               flex items-center gap-2">
+                                    <i data-lucide="save" class="w-4 h-4"></i>
+                                    Guardar Visita
+                                </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- ====== HISTORIAL DE VISITAS (Tabla resumen) ====== -->
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm mt-6">
+                        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                            <h3 class="text-base font-semibold text-slate-800">Historial de Visitas Recientes</h3>
+                            <span class="text-xs text-slate-400">Últimas 5 visitas</span>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="w-full text-sm">
+                                <thead>
+                                    <tr class="border-b border-slate-100 bg-slate-50">
+                                        <th class="text-left px-6 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wider">Fecha</th>
+                                        <th class="text-left px-6 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wider">Impresora</th>
+                                        <th class="text-left px-6 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wider">Motivo</th>
+                                        <th class="text-left px-6 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wider hidden md:table-cell">Reporte</th>
+                                        <th class="text-left px-6 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wider">Garantía</th>
+                                        <th class="text-right px-6 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wider">Costo</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr class="border-b border-slate-50 hover:bg-slate-50/50 transition">
+                                        <td class="px-6 py-3.5 text-slate-600">18/07/2026</td>
+                                        <td class="px-6 py-3.5 font-medium text-slate-700">HP M404dn</td>
+                                        <td class="px-6 py-3.5">
+                                            <span class="badge badge-repair">Correctiva</span>
+                                        </td>
+                                        <td class="px-6 py-3.5 text-slate-500 text-xs hidden md:table-cell">Cambio de rodillo de alimentación...</td>
+                                        <td class="px-6 py-3.5">
+                                            <span class="text-xs font-semibold text-success-600 bg-success-50 px-2 py-0.5 rounded-full">Sí</span>
+                                        </td>
+                                        <td class="px-6 py-3.5 text-right font-semibold text-slate-700">$0</td>
+                                    </tr>
+                                    <tr class="border-b border-slate-50 hover:bg-slate-50/50 transition">
+                                        <td class="px-6 py-3.5 text-slate-600">17/07/2026</td>
+                                        <td class="px-6 py-3.5 font-medium text-slate-700">Epson L4750</td>
+                                        <td class="px-6 py-3.5">
+                                            <span class="badge badge-active">Preventiva</span>
+                                        </td>
+                                        <td class="px-6 py-3.5 text-slate-500 text-xs hidden md:table-cell">Limpieza general y calibración...</td>
+                                        <td class="px-6 py-3.5">
+                                            <span class="text-xs font-semibold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">No</span>
+                                        </td>
+                                        <td class="px-6 py-3.5 text-right font-semibold text-slate-700">$35.000</td>
+                                    </tr>
+                                    <tr class="border-b border-slate-50 hover:bg-slate-50/50 transition">
+                                        <td class="px-6 py-3.5 text-slate-600">15/07/2026</td>
+                                        <td class="px-6 py-3.5 font-medium text-slate-700">Brother M428DW</td>
+                                        <td class="px-6 py-3.5">
+                                            <span class="badge badge-repair">Correctiva</span>
+                                        </td>
+                                        <td class="px-6 py-3.5 text-slate-500 text-xs hidden md:table-cell">Reemplazo de fusor dañado...</td>
+                                        <td class="px-6 py-3.5">
+                                            <span class="text-xs font-semibold text-success-600 bg-success-50 px-2 py-0.5 rounded-full">Sí</span>
+                                        </td>
+                                        <td class="px-6 py-3.5 text-right font-semibold text-slate-700">$0</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+
+                <!-- ====================================================
+                     MÓDULO 5: GESTIÓN DE USUARIOS
+                     ==================================================== -->
+                <section id="section-usuarios" class="page-section">
+
+                    <!-- Header con botón Nuevo -->
+                    <div class="flex flex-wrap items-center gap-3 mb-6">
+                        <h3 class="text-base font-semibold text-slate-800">Usuarios del Sistema</h3>
+                        <span id="usuariosCount" class="text-sm text-slate-400">(5)</span>
+                        <button onclick="toggleUsuarioForm()"
+                                class="ml-auto bg-primary-600 hover:bg-primary-700 text-white text-sm
+                                       font-semibold px-4 py-2.5 rounded-lg shadow-sm transition
+                                       flex items-center gap-2">
+                            <i data-lucide="user-plus" class="w-4 h-4"></i>
+                            <span>Nuevo Usuario</span>
+                        </button>
+                    </div>
+
+                    <!-- ====== FORMULARIO DE USUARIO (colapsable) ====== -->
+                    <div id="usuarioForm" class="hidden bg-white rounded-2xl border border-slate-200 shadow-sm mb-6">
+                        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                            <h4 class="text-base font-semibold text-slate-800">
+                                <span id="usuarioFormTitle">Registrar Nuevo Usuario</span>
+                            </h4>
+                            <button onclick="toggleUsuarioForm()" class="text-slate-400 hover:text-slate-600 transition">
+                                <i data-lucide="x" class="w-5 h-5"></i>
+                            </button>
+                        </div>
+                        <form class="p-6" onsubmit="return false;">
+                            <input type="hidden" id="usuarioIdEdit" value="">
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-600 mb-1.5">Nombre <span class="text-danger-500">*</span></label>
+                                    <input type="text" id="usuarioNombre" placeholder="Nombre completo"
+                                           class="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm placeholder:text-slate-300 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-600 mb-1.5">Email <span class="text-danger-500">*</span></label>
+                                    <input type="email" id="usuarioEmail" placeholder="usuario@correo.cl"
+                                           class="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm placeholder:text-slate-300 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-600 mb-1.5">Contraseña <span class="text-danger-500">*</span></label>
+                                    <input type="password" id="usuarioPassword" placeholder="Mínimo 4 caracteres"
+                                           class="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm placeholder:text-slate-300 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-600 mb-1.5">Rol <span class="text-danger-500">*</span></label>
+                                    <select id="usuarioRol"
+                                            class="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm text-slate-700 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition cursor-pointer">
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-600 mb-1.5">Cliente Asociado</label>
+                                    <select id="usuarioCliente"
+                                            class="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm text-slate-700 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition cursor-pointer">
+                                        <option value="">Ninguno (Admin interno)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-600 mb-1.5">Estado</label>
+                                    <select id="usuarioEstado"
+                                            class="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm text-slate-700 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition cursor-pointer">
+                                        <option value="activo">✅ Activo</option>
+                                        <option value="inactivo">❌ Inactivo</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-slate-100">
+                                <button type="button" onclick="toggleUsuarioForm()"
+                                        class="px-4 py-2.5 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition">
+                                    Cancelar
+                                </button>
+                                <button type="button" onclick="guardarUsuario()"
+                                        class="px-5 py-2.5 text-sm font-semibold text-white bg-primary-600 hover:bg-primary-700 rounded-lg shadow-sm transition">
+                                    Guardar Usuario
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- ====== TABLA DE USUARIOS ====== -->
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
+                        <div class="table-responsive">
+                            <table class="w-full text-sm">
+                                <thead>
+                                    <tr class="border-b border-slate-100 bg-slate-50">
+                                        <th class="text-left px-6 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wider">Nombre</th>
+                                        <th class="text-left px-6 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wider">Email</th>
+                                        <th class="text-left px-6 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wider hidden md:table-cell">Rol</th>
+                                        <th class="text-left px-6 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wider hidden lg:table-cell">Cliente</th>
+                                        <th class="text-left px-6 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wider">Estado</th>
+                                        <th class="text-center px-6 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wider">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="usuariosTableBody">
+                                    <!-- Se llena dinámicamente con JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+
+                <!-- ====================================================
+                     MÓDULO 6: CONFIGURACIÓN DEL SISTEMA
+                     ==================================================== -->
+                <section id="section-configuracion" class="page-section">
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+                        <!-- Datos de la Empresa -->
+                        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
+                            <div class="px-6 py-4 border-b border-slate-100 flex items-center gap-2">
+                                <i data-lucide="building" class="w-5 h-5 text-primary-500"></i>
+                                <h3 class="text-base font-semibold text-slate-800">Datos de la Empresa</h3>
+                            </div>
+                            <form class="p-6 space-y-4" onsubmit="return false;">
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-600 mb-1.5">Nombre de la Empresa</label>
+                                    <input type="text" id="cfgNombreEmpresa" value="MPS Servicios Técnicos SpA"
+                                           class="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition">
+                                </div>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-slate-600 mb-1.5">RUT</label>
+                                        <input type="text" id="cfgRutEmpresa" value="76.123.456-7"
+                                               class="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm font-mono focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-slate-600 mb-1.5">Teléfono</label>
+                                        <input type="tel" id="cfgTelefono" value="+56 2 2123 4567"
+                                               class="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-600 mb-1.5">Dirección</label>
+                                    <input type="text" id="cfgDireccion" value="Av. Tecnología 500, Piso 8, Santiago"
+                                           class="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-600 mb-1.5">Email Corporativo</label>
+                                    <input type="email" id="cfgEmail" value="contacto@mps.cl"
+                                           class="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition">
+                                </div>
+                                <button type="button" onclick="guardarConfigEmpresa()"
+                                        class="w-full bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold py-2.5 rounded-lg transition flex items-center justify-center gap-2">
+                                    <i data-lucide="save" class="w-4 h-4"></i>
+                                    Guardar Datos de Empresa
+                                </button>
+                            </form>
+                        </div>
+
+                        <!-- Parámetros del Sistema -->
+                        <div class="space-y-6">
+                            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
+                                <div class="px-6 py-4 border-b border-slate-100 flex items-center gap-2">
+                                    <i data-lucide="sliders" class="w-5 h-5 text-primary-500"></i>
+                                    <h3 class="text-base font-semibold text-slate-800">Parámetros del Sistema</h3>
+                                </div>
+                                <div class="p-6 space-y-4">
+                                    <div class="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-sm font-medium text-slate-600 mb-1.5">Moneda</label>
+                                            <select class="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition cursor-pointer">
+                                                <option value="CLP" selected>CLP — Peso Chileno</option>
+                                                <option value="USD">USD — Dólar</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-slate-600 mb-1.5">Zona Horaria</label>
+                                            <select class="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition cursor-pointer">
+                                                <option value="America/Santiago" selected>America/Santiago (GMT-4)</option>
+                                                <option value="America/Bogota">America/Bogota (GMT-5)</option>
+                                                <option value="America/Lima">America/Lima (GMT-5)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-sm font-medium text-slate-600 mb-1.5">Umbral Alerta Stock Bajo</label>
+                                            <input type="number" value="3" min="1"
+                                                   class="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition font-mono">
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-slate-600 mb-1.5">Días Alerta Garantía</label>
+                                            <input type="number" value="30" min="1"
+                                                   class="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition font-mono">
+                                        </div>
+                                    </div>
+                                    <button onclick="showToast('Parámetros guardados correctamente', 'success')"
+                                            class="w-full bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold py-2.5 rounded-lg transition flex items-center justify-center gap-2">
+                                        <i data-lucide="save" class="w-4 h-4"></i>
+                                        Guardar Parámetros
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Cambio de Contraseña -->
+                            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
+                                <div class="px-6 py-4 border-b border-slate-100 flex items-center gap-2">
+                                    <i data-lucide="key-round" class="w-5 h-5 text-warning-500"></i>
+                                    <h3 class="text-base font-semibold text-slate-800">Cambiar Contraseña</h3>
+                                </div>
+                                <div class="p-6 space-y-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-slate-600 mb-1.5">Contraseña Actual</label>
+                                        <input type="password" id="cfgPassActual" placeholder="••••••••"
+                                               class="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition">
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-sm font-medium text-slate-600 mb-1.5">Nueva Contraseña</label>
+                                            <input type="password" id="cfgPassNueva" placeholder="Mínimo 4 caracteres"
+                                                   class="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition">
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-slate-600 mb-1.5">Confirmar</label>
+                                            <input type="password" id="cfgPassConfirm" placeholder="Repetir contraseña"
+                                                   class="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition">
+                                        </div>
+                                    </div>
+                                    <button onclick="cambiarPassword()"
+                                            class="w-full bg-warning-500 hover:bg-warning-600 text-white text-sm font-semibold py-2.5 rounded-lg transition flex items-center justify-center gap-2">
+                                        <i data-lucide="key-round" class="w-4 h-4"></i>
+                                        Cambiar Contraseña
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Info del Sistema -->
+                            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm">
+                                <div class="px-6 py-4 border-b border-slate-100 flex items-center gap-2">
+                                    <i data-lucide="info" class="w-5 h-5 text-slate-400"></i>
+                                    <h3 class="text-base font-semibold text-slate-800">Información del Sistema</h3>
+                                </div>
+                                <div class="p-6 grid grid-cols-2 gap-y-3 text-sm">
+                                    <span class="text-slate-400">Versión:</span><span class="font-medium text-slate-700">MPS 2.0.0</span>
+                                    <span class="text-slate-400">Backend:</span><span class="font-medium text-slate-700">FastAPI + Python</span>
+                                    <span class="text-slate-400">Base de Datos:</span><span class="font-medium text-slate-700">MySQL 8.0</span>
+                                    <span class="text-slate-400">Frontend:</span><span class="font-medium text-slate-700">HTML5 + Tailwind CSS</span>
+                                    <span class="text-slate-400">Puerto API:</span><span class="font-medium text-slate-700">8000</span>
+                                    <span class="text-slate-400">Entorno:</span><span class="font-medium text-warning-600">Desarrollo</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+            </main>
+        </div>
+    </div>
+
+    <!-- ============================================================
+         ARCHIVO JAVASCRIPT: Lógica de navegación e interacción
+         ============================================================ -->
+    <script src="js/app.js"></script>
+</body>
+</html>

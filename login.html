@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MPS 2.0 — Iniciar Sesión</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: { 50:'#eff6ff',100:'#dbeafe',200:'#bfdbfe',300:'#93c5fd',400:'#60a5fa',500:'#3b82f6',600:'#2563eb',700:'#1d4ed8',800:'#1e40af',900:'#1e3a5f' },
+                        slate: { 50:'#f8fafc',100:'#f1f5f9',200:'#e2e8f0',300:'#cbd5e1',400:'#94a3b8',500:'#64748b',600:'#475569',700:'#334155',800:'#1e293b',900:'#0f172a' },
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        .bg-grid {
+            background-image: 
+                linear-gradient(rgba(59,130,246,0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(59,130,246,0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen bg-grid flex items-center justify-center p-4">
+
+    <div class="w-full max-w-md">
+        <!-- Logo / Brand -->
+        <div class="text-center mb-8">
+            <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-700
+                        flex items-center justify-center shadow-xl mx-auto mb-4">
+                <i data-lucide="printer" class="w-8 h-8 text-white"></i>
+            </div>
+            <h1 class="text-2xl font-bold text-slate-800 tracking-tight">MPS 2.0</h1>
+            <p class="text-sm text-slate-400 mt-1">Sistema de Gestión de Impresión</p>
+        </div>
+
+        <!-- Login Card -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-xl p-8">
+            <h2 class="text-lg font-semibold text-slate-800 mb-1">Iniciar Sesión</h2>
+            <p class="text-sm text-slate-400 mb-6">Ingresa tus credenciales para acceder al sistema</p>
+
+            <!-- Error Message -->
+            <div id="loginError" class="hidden mb-4 p-3 bg-danger-50 border border-danger-200 rounded-lg text-sm text-danger-600 font-medium flex items-center gap-2">
+                <i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
+                <span id="loginErrorText"></span>
+            </div>
+
+            <!-- Success Message -->
+            <div id="loginSuccess" class="hidden mb-4 p-3 bg-success-50 border border-success-200 rounded-lg text-sm text-success-600 font-medium flex items-center gap-2">
+                <i data-lucide="check-circle" class="w-4 h-4 shrink-0"></i>
+                <span id="loginSuccessText"></span>
+            </div>
+
+            <form id="loginForm" onsubmit="return false;">
+                <!-- Email -->
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-slate-600 mb-1.5">
+                        Email
+                    </label>
+                    <div class="relative">
+                        <i data-lucide="mail" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+                        <input type="email" id="loginEmail" placeholder="admin@mps.cl"
+                               class="w-full border border-slate-300 rounded-lg pl-10 pr-3.5 py-2.5 text-sm
+                                      placeholder:text-slate-300 focus:ring-2 focus:ring-primary-500
+                                      focus:border-primary-500 outline-none transition"
+                               value="admin@mps.cl">
+                    </div>
+                </div>
+
+                <!-- Password -->
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-slate-600 mb-1.5">
+                        Contraseña
+                    </label>
+                    <div class="relative">
+                        <i data-lucide="lock" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+                        <input type="password" id="loginPassword" placeholder="••••••••"
+                               class="w-full border border-slate-300 rounded-lg pl-10 pr-10 py-2.5 text-sm
+                                      placeholder:text-slate-300 focus:ring-2 focus:ring-primary-500
+                                      focus:border-primary-500 outline-none transition"
+                               value="123456">
+                        <button type="button" onclick="togglePassword()"
+                                class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition">
+                            <i data-lucide="eye" id="eyeIcon" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Remember + Forgot -->
+                <div class="flex items-center justify-between mb-6">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" id="rememberMe"
+                               class="w-4 h-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500">
+                        <span class="text-sm text-slate-500">Recordarme</span>
+                    </label>
+                    <button type="button" onclick="showDemoInfo()"
+                            class="text-sm text-primary-600 hover:text-primary-700 font-medium transition">
+                        Credenciales demo
+                    </button>
+                </div>
+
+                <!-- Submit Button -->
+                <button type="button" onclick="login()"
+                        id="loginButton"
+                        class="w-full bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold
+                               py-3 rounded-lg shadow-sm transition-all duration-200
+                               flex items-center justify-center gap-2
+                               hover:shadow-md active:scale-[0.98]">
+                    <i data-lucide="log-in" class="w-4 h-4"></i>
+                    <span id="loginButtonText">Ingresar</span>
+                </button>
+            </form>
+        </div>
+
+        <!-- Footer -->
+        <p class="text-center text-xs text-slate-400 mt-6">
+            MPS 2.0 v2.0.0 — Sistema de Gestión de Impresión
+        </p>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin + '/api';
+
+        // Verificar si ya hay sesión activa
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            const user = localStorage.getItem('mps_user');
+            if (user) {
+                window.location.href = '/';
+            }
+        });
+
+        async function login() {
+            const email = document.getElementById('loginEmail').value.trim();
+            const password = document.getElementById('loginPassword').value;
+
+            if (!email || !password) {
+                showNotification('Ingresa email y contraseña', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('loginButton');
+            const btnText = document.getElementById('loginButtonText');
+            btn.disabled = true;
+            btnText.textContent = 'Verificando...';
+
+            try {
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.detail || 'Credenciales incorrectas');
+                }
+
+                // Guardar sesión en localStorage
+                localStorage.setItem('mps_user', JSON.stringify(data));
+                showNotification('Inicio de sesión exitoso. Redirigiendo...', 'success');
+
+                // Redirigir al dashboard
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 1000);
+
+            } catch (error) {
+                showNotification(error.message, 'error');
+                btn.disabled = false;
+                btnText.textContent = 'Ingresar';
+            }
+        }
+
+        function togglePassword() {
+            const input = document.getElementById('loginPassword');
+            const icon = document.getElementById('eyeIcon');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.setAttribute('data-lucide', 'eye-off');
+            } else {
+                input.type = 'password';
+                icon.setAttribute('data-lucide', 'eye');
+            }
+            lucide.createIcons({ nodes: [icon.parentElement] });
+        }
+
+        function showNotification(message, type) {
+            const errorEl = document.getElementById('loginError');
+            const successEl = document.getElementById('loginSuccess');
+            errorEl.classList.add('hidden');
+            successEl.classList.add('hidden');
+
+            if (type === 'error') {
+                document.getElementById('loginErrorText').textContent = message;
+                errorEl.classList.remove('hidden');
+            } else {
+                document.getElementById('loginSuccessText').textContent = message;
+                successEl.classList.remove('hidden');
+            }
+        }
+
+        function showDemoInfo() {
+            document.getElementById('loginError').classList.add('hidden');
+            document.getElementById('loginSuccess').classList.remove('hidden');
+            document.getElementById('loginSuccessText').textContent = 'Email: admin@mps.cl | Contraseña: 123456';
+        }
+
+        // Enter para enviar
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') login();
+        });
+    </script>
+</body>
+</html>

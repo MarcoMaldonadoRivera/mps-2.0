@@ -1,0 +1,72 @@
+================================================================
+MPS 2.0 — SISTEMA DE GESTIÓN DE IMPRESIÓN
+Instrucciones de Funcionamiento y Estructura del Proyecto
+================================================================
+
+Este proyecto es una aplicación web SPA (Single Page Application) para la administración de un parque de impresoras multi-cliente, orientada a servicios técnicos de impresión (Managed Print Services - MPS).
+
+----------------------------------------------------------------
+1. ESTRUCTURA DEL PROYECTO
+----------------------------------------------------------------
+El proyecto está dividido en Frontend (HTML/JS) y Backend (Python + FastAPI):
+
+* [Raíz del proyecto]
+  ├── index.html          # Interfaz principal (Dashboard, Clientes, Impresoras, etc.)
+  ├── login.html          # Vista de inicio de sesión con credenciales demo
+  ├── mysql.txt           # Credenciales de la base de datos MySQL en la nube
+  ├── corre servidor.txt  # Comando para ejecutar el servidor de desarrollo
+  ├── instrucciones.txt   # Este archivo descriptivo
+  │
+  ├── js/
+  │   └── app.js          # Lógica del cliente, renderizado dinámico, llamadas a la API
+  │
+  └── backend/
+      ├── main.py         # Punto de entrada de FastAPI, enrutamiento y lógica de negocio
+      ├── database.py     # Configuración de conexión SQLAlchemy (MySQL nube)
+      ├── models.py       # Definición de tablas del sistema en base de datos (SQLAlchemy)
+      └── schemas.py      # Esquemas de validación de datos (Pydantic)
+
+----------------------------------------------------------------
+2. CÓMO EJECUTAR EL PROYECTO
+----------------------------------------------------------------
+Requisitos previos: Python 3 y las librerías necesarias instaladas (fastapi, uvicorn, sqlalchemy, pymysql, cryptography, etc.).
+
+1. Abre una terminal en la raíz del proyecto (donde se encuentra este archivo).
+2. Ejecuta el servidor uvicorn especificando el directorio de la aplicación:
+   
+   uvicorn main:app --reload --app-dir backend
+
+3. Una vez iniciado el servidor, accede desde tu navegador a:
+   http://localhost:8000 (redirecciona automáticamente al login o al dashboard)
+4. La documentación interactiva de la API (Swagger UI) está disponible en:
+   http://localhost:8000/docs
+
+----------------------------------------------------------------
+3. FLUJO DE TRABAJO Y FUNCIONALIDADES
+----------------------------------------------------------------
+El sistema opera de la siguiente manera:
+
+* Autenticación (login.html):
+  Permite ingresar al sistema utilizando credenciales del usuario. Posee un botón rápido para usar credenciales de demostración.
+
+* Navegación y Roles (index.html + app.js):
+  El menú lateral permite alternar entre las diferentes secciones. Además, incluye un selector de "Rol Activo" en la barra lateral que adapta los KPIs (indicadores clave de rendimiento) del Dashboard de acuerdo al perfil seleccionado (Gerente General, Finanzas, Técnico o Freelance).
+
+* Gestión Multicliente:
+  Permite crear, listar, editar y eliminar los clientes asignados al servicio de impresión.
+
+* Parque de Impresoras y Niveles de Suministros:
+  Muestra los equipos contratados por cliente, sus IPs, números de serie y estado de la garantía. Además, calcula y muestra de forma visual mediante barras de progreso los niveles estimados de insumos (Tóner, Drum, Fusor y Kit de mantenimiento) generando alertas críticas cuando están próximos a agotarse.
+
+* Registro Operativo:
+  - Registro de Contadores: Permite el ingreso mensual de lecturas (contador inicial y actual), calculando de forma automática el volumen de páginas consumidas.
+  - Visita Técnica: Registro de mantenimientos preventivos o reparaciones correctivas, con bitácora de reporte, costo asociado y opción de cobertura por garantía.
+
+* Gestión de Usuarios e Información del Sistema:
+  Administración de perfiles y estados de usuarios registrados, junto con la configuración de datos de la empresa y parámetros de umbrales para las alertas.
+
+----------------------------------------------------------------
+4. BASE DE DATOS
+----------------------------------------------------------------
+* Ubicación: La base de datos es MySQL y está alojada en un servidor en la nube (sql10.freesqldatabase.com).
+* Inicialización: Al arrancar el servidor FastAPI con Uvicorn, SQLAlchemy verifica de forma automática si las tablas existen en la base de datos y, si no, las crea utilizando los modelos declarados en 'models.py'.
