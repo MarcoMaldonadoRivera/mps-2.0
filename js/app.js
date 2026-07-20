@@ -10,7 +10,7 @@
 // ================================================================
 // CONFIGURACIÓN DE LA API
 // ================================================================
-const API_BASE = 'https://mps-2-0.onrender.com';
+const API_BASE = 'https://mps-2-0.onrender.com/api';
 
 /**
  * Wrapper genérico para peticiones fetch al backend.
