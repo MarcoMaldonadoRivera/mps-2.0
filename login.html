@@ -128,7 +128,9 @@
     </div>
 
     <script>
-        const API_BASE = window.location.origin + '/api';
+        const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+            ? 'http://localhost:8000/api'
+            : 'https://mps-2-0.onrender.com/api';
 
         // Verificar si ya hay sesión activa
         document.addEventListener('DOMContentLoaded', () => {
